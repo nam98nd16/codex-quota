@@ -6,10 +6,10 @@ A TUI for monitoring Codex quota written in Go using [Bubble Tea](https://github
 
 ## Features
 
-- Multiple accounts from local app storage, OpenCode, and Codex auth files
-- OAuth authentication via browser (`n`)
-- Apply active account to OpenCode auth (`o`)
-- Quota display for primary and secondary windows when available
+- Multiple Codex accounts
+- Accounts from local app storage, OpenCode, and Codex auth files
+- OAuth authentication via browser
+- Apply active account to OpenCode auth
 
 ## Installation
 
@@ -37,10 +37,10 @@ On first launch press `n` to add an account via OAuth.
 
 ## Controls
 
-- `n` - add new account
-- `left/right` (or `h/l`) - switch between accounts
-- `r` - refresh data
-- `i` - toggle additional info
-- `o` - apply active account to OpenCode auth
-- `x` - delete current account (only locally added app accounts; external accounts are read-only)
-- `q` (or `esc`) - quit
+- `n` — add new account
+- `←` / `→` (or `h` / `l`) — switch between accounts
+- `r` — refresh data
+- `i` — toggle additional info
+- `o` — apply active account to OpenCode auth
+- `x` — delete current account (only locally added app accounts; external accounts are read-only)
+- `q` (or `Esc`) — quit
