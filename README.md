@@ -10,7 +10,7 @@ A TUI for switching between Codex accounts and monitoring quota usage, written i
 - Multi-target apply: set active account for Codex and/or OpenCode in one flow
 - Accounts from local app storage, OpenCode auth, and Codex auth
 - OAuth authentication via browser
-- - Two view modes: compact for many accounts, tabs for focused viewing when you have just a few.
+- Two view modes: compact for many accounts, tabs for focused viewing when you have just a few.
 ## Installation
 
 ```bash
