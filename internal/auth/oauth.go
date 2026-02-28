@@ -127,7 +127,7 @@ func LoginOpenAICodex() (*config.Account, error) {
 	}
 
 	claims := config.ParseAccessToken(account.AccessToken)
-	account.AccountID = claims.AccountID
+	account.AccountID = config.CanonicalAccountID(account.AccountID, claims.AccountID)
 	if claims.ClientID != "" {
 		account.ClientID = claims.ClientID
 	}
@@ -181,6 +181,10 @@ func fetchUserEmail(accessToken string) (string, string, error) {
 	email := strings.TrimSpace(payload.Email)
 	name := strings.TrimSpace(payload.Name)
 	return email, name, nil
+}
+
+func FetchUserEmail(accessToken string) (string, string, error) {
+	return fetchUserEmail(accessToken)
 }
 
 func buildAuthorizeURL(state, challenge string) string {

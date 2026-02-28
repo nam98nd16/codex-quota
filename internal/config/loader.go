@@ -11,13 +11,11 @@ import (
 )
 
 func LoadAllAccountsWithSources() (AccountsLoadResult, error) {
-	accounts := make([]*Account, 0, 6)
-
 	appAccounts, err := LoadManagedAccounts()
 	if err != nil {
 		return AccountsLoadResult{}, err
 	}
-	accounts = append(accounts, appAccounts...)
+	externalAccounts := make([]*Account, 0, 4)
 
 	opencodePaths := opencodeAuthPaths()
 	writable := firstExistingPath(opencodePaths)
@@ -31,7 +29,7 @@ func LoadAllAccountsWithSources() (AccountsLoadResult, error) {
 			return AccountsLoadResult{}, err
 		}
 		if openCodeMain != nil {
-			accounts = append(accounts, openCodeMain)
+			externalAccounts = append(externalAccounts, openCodeMain)
 		}
 	}
 
@@ -40,16 +38,42 @@ func LoadAllAccountsWithSources() (AccountsLoadResult, error) {
 		return AccountsLoadResult{}, err
 	}
 	if codexAccount != nil {
-		accounts = append(accounts, codexAccount)
+		externalAccounts = append(externalAccounts, codexAccount)
 	}
+
+	activeOpenCodeAccount, err := loadOpenCodeAccountFile(opencodeAuthPath(), SourceOpenCode, true)
+	if err != nil {
+		return AccountsLoadResult{}, err
+	}
+
+	if syncExternalAccountsToManaged(appAccounts, externalAccounts) {
+		refreshedManaged, reloadErr := LoadManagedAccounts()
+		if reloadErr == nil {
+			appAccounts = refreshedManaged
+		}
+	}
+
+	accounts := make([]*Account, 0, len(appAccounts)+len(externalAccounts))
+	accounts = append(accounts, appAccounts...)
+	accounts = append(accounts, externalAccounts...)
 
 	sourcesByAccountID := make(map[string][]string)
 	for _, account := range accounts {
-		if account == nil || account.AccountID == "" {
+		if account == nil {
 			continue
 		}
-		sourcesByAccountID[account.AccountID] = appendUniqueString(sourcesByAccountID[account.AccountID], account.SourceLabel())
+		if account.AccountID != "" {
+			sourcesByAccountID[account.AccountID] = appendUniqueString(sourcesByAccountID[account.AccountID], account.SourceLabel())
+		}
+		if email := normalizeEmail(account.Email); email != "" {
+			emailKey := "email:" + email
+			sourcesByAccountID[emailKey] = appendUniqueString(sourcesByAccountID[emailKey], account.SourceLabel())
+		}
 	}
+
+	activeSourcesByIdentity := make(map[string][]string)
+	appendActiveSource(activeSourcesByIdentity, codexAccount, SourceCodex)
+	appendActiveSource(activeSourcesByIdentity, activeOpenCodeAccount, SourceOpenCode)
 
 	accounts = dedupeAccounts(accounts)
 	for _, account := range accounts {
@@ -60,7 +84,148 @@ func LoadAllAccountsWithSources() (AccountsLoadResult, error) {
 		return strings.ToLower(accounts[i].Label) < strings.ToLower(accounts[j].Label)
 	})
 
-	return AccountsLoadResult{Accounts: accounts, SourcesByAccountID: sourcesByAccountID}, nil
+	return AccountsLoadResult{
+		Accounts:                accounts,
+		SourcesByAccountID:      sourcesByAccountID,
+		ActiveSourcesByIdentity: activeSourcesByIdentity,
+	}, nil
+}
+
+func appendActiveSource(target map[string][]string, account *Account, source Source) {
+	if target == nil || account == nil {
+		return
+	}
+	if source != SourceCodex && source != SourceOpenCode {
+		return
+	}
+
+	sourceLabel := string(source)
+	for _, key := range ActiveIdentityKeys(account) {
+		target[key] = appendUniqueString(target[key], sourceLabel)
+	}
+}
+
+func syncExternalAccountsToManaged(managedAccounts []*Account, externalAccounts []*Account) bool {
+	candidates := externalImportCandidates(externalAccounts)
+	if len(candidates) == 0 {
+		return false
+	}
+
+	managedByIdentity := make(map[string]*Account, len(managedAccounts))
+	for _, account := range managedAccounts {
+		if account == nil {
+			continue
+		}
+		for _, key := range accountIdentityKeys(account) {
+			managedByIdentity[key] = account
+		}
+	}
+
+	updated := false
+	for _, candidate := range candidates {
+		imported := cloneAsManaged(candidate)
+		if imported == nil {
+			continue
+		}
+
+		existing := findManagedByIdentity(managedByIdentity, imported)
+		if !needsManagedUpdate(existing, imported) {
+			continue
+		}
+
+		if err := UpsertManagedAccount(imported); err != nil {
+			continue
+		}
+
+		merged := imported
+		if existing != nil {
+			merged = mergeAccounts(existing, imported)
+		}
+		for _, key := range accountIdentityKeys(merged) {
+			managedByIdentity[key] = merged
+		}
+		updated = true
+	}
+
+	return updated
+}
+
+func externalImportCandidates(externalAccounts []*Account) []*Account {
+	filtered := make([]*Account, 0, len(externalAccounts))
+	for _, account := range externalAccounts {
+		if account == nil {
+			continue
+		}
+		if strings.TrimSpace(account.AccessToken) == "" {
+			continue
+		}
+		if strings.TrimSpace(account.AccountID) == "" {
+			continue
+		}
+		filtered = append(filtered, account)
+	}
+	return dedupeAccounts(filtered)
+}
+
+func cloneAsManaged(account *Account) *Account {
+	if account == nil {
+		return nil
+	}
+	accountID := strings.TrimSpace(account.AccountID)
+	if accountID == "" {
+		return nil
+	}
+	accessToken := strings.TrimSpace(account.AccessToken)
+	if accessToken == "" {
+		return nil
+	}
+
+	return &Account{
+		Label:        strings.TrimSpace(account.Label),
+		Email:        strings.TrimSpace(account.Email),
+		AccountID:    CanonicalAccountID(accountID),
+		AccessToken:  accessToken,
+		RefreshToken: strings.TrimSpace(account.RefreshToken),
+		ExpiresAt:    account.ExpiresAt,
+		ClientID:     strings.TrimSpace(account.ClientID),
+		Source:       SourceManaged,
+		Writable:     true,
+	}
+}
+
+func needsManagedUpdate(existing *Account, incoming *Account) bool {
+	if incoming == nil {
+		return false
+	}
+	if existing == nil {
+		return true
+	}
+
+	merged := mergeAccounts(existing, incoming)
+	if merged == nil {
+		return false
+	}
+
+	if strings.TrimSpace(existing.AccessToken) != strings.TrimSpace(merged.AccessToken) {
+		return true
+	}
+	if strings.TrimSpace(existing.RefreshToken) != strings.TrimSpace(merged.RefreshToken) {
+		return true
+	}
+	if strings.TrimSpace(existing.ClientID) != strings.TrimSpace(merged.ClientID) {
+		return true
+	}
+	if strings.TrimSpace(existing.Email) != strings.TrimSpace(merged.Email) {
+		return true
+	}
+	if strings.TrimSpace(existing.Label) != strings.TrimSpace(merged.Label) {
+		return true
+	}
+	if !existing.ExpiresAt.Equal(merged.ExpiresAt) {
+		return true
+	}
+
+	return false
 }
 
 func loadOpenCodeAccountFile(path string, source Source, writable bool) (*Account, error) {
@@ -106,9 +271,7 @@ func buildOpenAIAccount(openai map[string]any, source Source, path string, writa
 	}
 
 	claims := ParseAccessToken(accessToken)
-	if account.AccountID == "" {
-		account.AccountID = claims.AccountID
-	}
+	account.AccountID = CanonicalAccountID(account.AccountID, claims.AccountID)
 	if account.ClientID == "" {
 		account.ClientID = claims.ClientID
 	}
@@ -151,9 +314,7 @@ func loadCodexAccountFile(path string) (*Account, error) {
 	}
 
 	claims := ParseAccessToken(accessToken)
-	if account.AccountID == "" {
-		account.AccountID = claims.AccountID
-	}
+	account.AccountID = CanonicalAccountID(account.AccountID, claims.AccountID)
 	account.ClientID = claims.ClientID
 	account.ExpiresAt = claims.ExpiresAt
 
@@ -216,6 +377,10 @@ func finalizeAccount(account *Account) {
 		return
 	}
 
+	if shouldReplaceLabelWithEmail(account) {
+		account.Label = account.Email
+	}
+
 	if account.Label == "" {
 		if account.Email != "" {
 			account.Label = account.Email
@@ -233,6 +398,56 @@ func finalizeAccount(account *Account) {
 			account.Key = fmt.Sprintf("%s:%s", account.Source, filepath.Base(account.FilePath))
 		}
 	}
+}
+
+func shouldReplaceLabelWithEmail(account *Account) bool {
+	if account == nil {
+		return false
+	}
+	email := strings.TrimSpace(account.Email)
+	if email == "" {
+		return false
+	}
+	label := strings.TrimSpace(account.Label)
+	if label == "" {
+		return true
+	}
+	if label == account.SourceLabel() {
+		return true
+	}
+	if strings.EqualFold(label, "n/a") {
+		return true
+	}
+	if accountID := strings.TrimSpace(account.AccountID); accountID != "" && label == shortAccountID(accountID) {
+		return true
+	}
+	if strings.HasPrefix(strings.ToLower(label), "auth0|") {
+		return true
+	}
+	return false
+}
+
+func accountIdentityKeys(account *Account) []string {
+	if account == nil {
+		return nil
+	}
+	keys := make([]string, 0, 2)
+	if email := normalizeEmail(account.Email); email != "" {
+		keys = append(keys, "email:"+email)
+	}
+	if accountID := strings.TrimSpace(account.AccountID); accountID != "" {
+		keys = append(keys, "account:"+accountID)
+	}
+	return keys
+}
+
+func findManagedByIdentity(index map[string]*Account, account *Account) *Account {
+	for _, key := range accountIdentityKeys(account) {
+		if current, ok := index[key]; ok {
+			return current
+		}
+	}
+	return nil
 }
 
 func appendUniqueString(values []string, value string) []string {

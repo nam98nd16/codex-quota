@@ -2,11 +2,13 @@ package ui
 
 import (
 	"strings"
-
-	"github.com/deLiseLINO/codex-quota/internal/config"
 )
 
-func renderAccountTabs(accounts []*config.Account, activeIndex, width int) string {
+func (m Model) renderAccountTabs() string {
+	accounts := m.Accounts
+	activeIndex := m.ActiveAccountIx
+	width := m.Width
+
 	if len(accounts) == 0 {
 		return ""
 	}
@@ -44,14 +46,33 @@ func renderAccountTabs(accounts []*config.Account, activeIndex, width int) strin
 		if label == "" {
 			label = account.SourceLabel()
 		}
-		label = truncateLabel(label, 28)
-
-		style := TabInactiveStyle
-		if i == activeIndex {
-			style = TabActiveStyle
+		subscribed := m.hasSubscription(account)
+		badgesRaw := m.activeSourceBadgesForAccount(account)
+		if badgesRaw != "" {
+			limit := 28 - (m.activeSourceBadgesDisplayWidth(account) + 1)
+			if limit < 4 {
+				limit = 4
+			}
+			label = truncateLabel(label, limit)
+		} else {
+			label = truncateLabel(label, 28)
+		}
+		labelText := TabInactiveStyle.Render(label)
+		switch {
+		case subscribed && i == activeIndex:
+			labelText = SubscribedLabelActiveStyle.Render(label)
+		case subscribed:
+			labelText = SubscribedLabelMutedStyle.Render(label)
+		case i == activeIndex:
+			labelText = TabActiveStyle.Render(label)
 		}
 
-		tabs = append(tabs, style.Render(label))
+		if badgesRaw != "" {
+			badges := m.renderActiveSourceBadges(account, i == activeIndex)
+			tabs = append(tabs, badges+" "+labelText)
+			continue
+		}
+		tabs = append(tabs, labelText)
 	}
 
 	if end < len(accounts) {

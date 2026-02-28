@@ -62,4 +62,33 @@ var (
 			Border(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.Color("240")).
 			Padding(0, 1)
+
+	SourceBadgeBracketStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("240"))
+	SourceCodexBadgeActiveStyle = lipgloss.NewStyle().
+					Bold(true).
+					Foreground(lipgloss.Color("205"))
+	SourceOpenCodeBadgeActiveStyle = lipgloss.NewStyle().
+					Bold(true).
+					Foreground(lipgloss.Color("39"))
+	SourceCodexBadgeMutedStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("176"))
+	SourceOpenCodeBadgeMutedStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("31"))
+	SourceBadgeSeparatorStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("240"))
+
+	SubscribedLabelActiveStyle = lipgloss.NewStyle().
+					Bold(true).
+					Underline(true).
+					Foreground(lipgloss.Color("177"))
+	SubscribedLabelMutedStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("141"))
+	SubscribedPercentPrefixStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("177"))
+	CompactExhaustedHeaderStyle = lipgloss.NewStyle().
+					Bold(true).
+					Foreground(lipgloss.Color("251"))
+	BarEmptyStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("238"))
 )

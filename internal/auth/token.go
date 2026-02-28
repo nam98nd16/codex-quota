@@ -117,7 +117,7 @@ func RefreshToken(account *config.Account) error {
 		account.ClientID = clientID
 	}
 	if claims.AccountID != "" {
-		account.AccountID = claims.AccountID
+		account.AccountID = config.CanonicalAccountID(account.AccountID, claims.AccountID)
 	}
 
 	if tokenResp.ExpiresIn > 0 {

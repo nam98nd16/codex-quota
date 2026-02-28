@@ -33,6 +33,9 @@ func dedupeKey(account *Account) string {
 	if account.AccountID != "" {
 		return "account:" + account.AccountID
 	}
+	if email := normalizeEmail(account.Email); email != "" {
+		return "email:" + email
+	}
 	if account.RefreshToken != "" {
 		return "refresh:" + account.RefreshToken
 	}
@@ -57,6 +60,7 @@ func mergeAccounts(left, right *Account) *Account {
 	if merged.AccountID == "" {
 		merged.AccountID = secondary.AccountID
 	}
+	merged.AccountID = CanonicalAccountID(merged.AccountID, secondary.AccountID)
 	if merged.ClientID == "" {
 		merged.ClientID = secondary.ClientID
 	}

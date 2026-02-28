@@ -29,17 +29,19 @@ func ParseAccessToken(token string) AccessTokenClaims {
 	}
 
 	claims := AccessTokenClaims{
-		ClientID:  strings.TrimSpace(asString(claimsMap["cid"])),
-		AccountID: strings.TrimSpace(asString(claimsMap["https://api.openai.com/auth"])),
-		Email:     strings.TrimSpace(asString(claimsMap["email"])),
+		ClientID: strings.TrimSpace(asString(claimsMap["cid"])),
+		Email:    strings.TrimSpace(asString(claimsMap["email"])),
 	}
 
-	if claims.AccountID == "" {
-		claims.AccountID = strings.TrimSpace(asString(claimsMap["account_id"]))
+	rawAuthAccountID := strings.TrimSpace(asString(claimsMap["https://api.openai.com/auth"]))
+	if rawAuthAccountID == "" {
+		if authMap := asMap(claimsMap["https://api.openai.com/auth"]); authMap != nil {
+			rawAuthAccountID = strings.TrimSpace(asString(authMap["chatgpt_account_id"]))
+		}
 	}
-	if claims.AccountID == "" {
-		claims.AccountID = strings.TrimSpace(asString(claimsMap["sub"]))
-	}
+	rawAccountID := strings.TrimSpace(asString(claimsMap["account_id"]))
+	subjectID := strings.TrimSpace(asString(claimsMap["sub"]))
+	claims.AccountID = CanonicalAccountID(rawAuthAccountID, rawAccountID, subjectID)
 
 	if exp, ok := asInt64(claimsMap["exp"]); ok && exp > 0 {
 		claims.ExpiresAt = time.Unix(exp, 0)
