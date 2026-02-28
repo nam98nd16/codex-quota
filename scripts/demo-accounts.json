@@ -1,0 +1,94 @@
+{
+  "accounts": [
+    {
+      "label": "demo+00-plus@example.test",
+      "email": "demo+00-plus@example.test",
+      "account_id": "acct_demo_plus",
+      "access_token": "demo_access_token_plus",
+      "refresh_token": "demo_refresh_token_plus",
+      "expires_at_ms": 4102444800000,
+      "client_id": "demo_client"
+    },
+    {
+      "label": "demo+active@example.test",
+      "email": "demo+active@example.test",
+      "account_id": "acct_demo_free_active",
+      "access_token": "demo_access_token_free_active",
+      "refresh_token": "demo_refresh_token_free_active",
+      "expires_at_ms": 4102444800000,
+      "client_id": "demo_client"
+    },
+    {
+      "label": "demo+alpha@example.test",
+      "email": "demo+alpha@example.test",
+      "account_id": "acct_demo_free_alpha",
+      "access_token": "demo_access_token_free_alpha",
+      "refresh_token": "demo_refresh_token_free_alpha",
+      "expires_at_ms": 4102444800000,
+      "client_id": "demo_client"
+    },
+    {
+      "label": "demo+beta@example.test",
+      "email": "demo+beta@example.test",
+      "account_id": "acct_demo_free_beta",
+      "access_token": "demo_access_token_free_beta",
+      "refresh_token": "demo_refresh_token_free_beta",
+      "expires_at_ms": 4102444800000,
+      "client_id": "demo_client"
+    },
+    {
+      "label": "demo+gamma@example.test",
+      "email": "demo+gamma@example.test",
+      "account_id": "acct_demo_free_gamma",
+      "access_token": "demo_access_token_free_gamma",
+      "refresh_token": "demo_refresh_token_free_gamma",
+      "expires_at_ms": 4102444800000,
+      "client_id": "demo_client"
+    },
+    {
+      "label": "demo+delta@example.test",
+      "email": "demo+delta@example.test",
+      "account_id": "acct_demo_free_delta",
+      "access_token": "demo_access_token_free_delta",
+      "refresh_token": "demo_refresh_token_free_delta",
+      "expires_at_ms": 4102444800000,
+      "client_id": "demo_client"
+    },
+    {
+      "label": "demo+epsilon@example.test",
+      "email": "demo+epsilon@example.test",
+      "account_id": "acct_demo_free_epsilon",
+      "access_token": "demo_access_token_free_epsilon",
+      "refresh_token": "demo_refresh_token_free_epsilon",
+      "expires_at_ms": 4102444800000,
+      "client_id": "demo_client"
+    },
+    {
+      "label": "demo+zeta@example.test",
+      "email": "demo+zeta@example.test",
+      "account_id": "acct_demo_free_zeta",
+      "access_token": "demo_access_token_free_zeta",
+      "refresh_token": "demo_refresh_token_free_zeta",
+      "expires_at_ms": 4102444800000,
+      "client_id": "demo_client"
+    },
+    {
+      "label": "demo+eta@example.test",
+      "email": "demo+eta@example.test",
+      "account_id": "acct_demo_free_eta",
+      "access_token": "demo_access_token_free_eta",
+      "refresh_token": "demo_refresh_token_free_eta",
+      "expires_at_ms": 4102444800000,
+      "client_id": "demo_client"
+    },
+    {
+      "label": "demo+theta@example.test",
+      "email": "demo+theta@example.test",
+      "account_id": "acct_demo_free_theta",
+      "access_token": "demo_access_token_free_theta",
+      "refresh_token": "demo_refresh_token_free_theta",
+      "expires_at_ms": 4102444800000,
+      "client_id": "demo_client"
+    }
+  ]
+}

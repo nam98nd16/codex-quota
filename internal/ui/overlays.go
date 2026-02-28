@@ -6,6 +6,8 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/deLiseLINO/codex-quota/internal/config"
 )
 
 func (m Model) currentOverlayModal() string {
@@ -13,20 +15,20 @@ func (m Model) currentOverlayModal() string {
 		return m.renderInfoModal()
 	}
 
+	if m.DeleteSourceSelect {
+		return m.renderDeleteSourceModal()
+	}
+
 	if m.DeleteConfirm {
-		return renderMessageModal(
-			"Delete account",
-			"Delete this account?\n[enter] Confirm   [esc] Cancel",
-			WarningStyle,
-		)
+		return m.renderDeleteConfirmModal()
+	}
+
+	if m.ApplyTargetSelect {
+		return m.renderApplyTargetModal()
 	}
 
 	if m.ApplyConfirm {
-		return renderMessageModal(
-			"Apply to OpenCode",
-			"Apply this account to OpenCode auth?\n[enter] Confirm   [esc] Cancel",
-			WarningStyle,
-		)
+		return m.renderApplyConfirmModal()
 	}
 
 	if m.Err != nil {
@@ -45,11 +47,95 @@ func (m Model) currentOverlayModal() string {
 }
 
 func renderMessageModal(title, message string, titleStyle lipgloss.Style) string {
+	if len(message) > 90 {
+		message = message[:87] + "..."
+	}
 	content := strings.Join([]string{
 		titleStyle.Render(title),
 		InfoValueStyle.Render(message),
 	}, "\n\n")
 	return InfoBoxStyle.Copy().Width(64).Render(content)
+}
+
+func (m Model) renderDeleteSourceModal() string {
+	lines := []string{
+		WarningStyle.Render("Delete account"),
+		InfoValueStyle.Render("Select sources to delete:"),
+	}
+
+	for i, source := range m.DeleteSourceOptions {
+		cursor := " "
+		if i == m.DeleteSourceCursor {
+			cursor = ">"
+		}
+		mark := " "
+		if m.isDeleteSourceSelected(source) {
+			mark = "x"
+		}
+		lines = append(lines, InfoValueStyle.Render(fmt.Sprintf("%s [%d] [%s] %s", cursor, i+1, mark, sourceDisplayName(source))))
+	}
+
+	lines = append(lines, "")
+	lines = append(lines, InfoValueStyle.Render("[↑/↓] Move   [space] Toggle   [enter] Next   [esc] Cancel"))
+
+	content := strings.Join(lines, "\n")
+	return InfoBoxStyle.Copy().Width(68).Render(content)
+}
+
+func (m Model) renderDeleteConfirmModal() string {
+	lines := []string{
+		WarningStyle.Render("Delete account"),
+		InfoValueStyle.Render(fmt.Sprintf("Sources: %s", sourceListText(m.selectedDeleteSources()))),
+	}
+	lines = append(lines, InfoValueStyle.Render("[enter] Confirm   [esc] Cancel"))
+
+	content := strings.Join(lines, "\n")
+	return InfoBoxStyle.Copy().Width(68).Render(content)
+}
+
+func (m Model) renderApplyTargetModal() string {
+	targets := applyTargetsOrdered()
+
+	lines := []string{
+		WarningStyle.Render("Apply account"),
+		InfoValueStyle.Render("Select targets to apply:"),
+	}
+
+	for i, target := range targets {
+		cursor := " "
+		if i == m.ApplyTargetCursor {
+			cursor = ">"
+		}
+		mark := " "
+		if m.ApplyTargets != nil && m.ApplyTargets[target] {
+			mark = "x"
+		}
+		label := "Codex app/cli"
+		if target == config.SourceOpenCode {
+			label = "OpenCode"
+		}
+		lines = append(lines, InfoValueStyle.Render(fmt.Sprintf("%s [%d] [%s] %s", cursor, i+1, mark, label)))
+	}
+
+	lines = append(lines, "")
+	lines = append(lines, InfoValueStyle.Render("[↑/↓] Move   [space] Toggle   [enter] Next   [esc] Cancel"))
+
+	content := strings.Join(lines, "\n")
+	return InfoBoxStyle.Copy().Width(68).Render(content)
+}
+
+func (m Model) renderApplyConfirmModal() string {
+	selected := m.selectedApplyTargets()
+	targetLabel := sourceListText(selected)
+	if len(selected) == 0 {
+		targetLabel = "codex, opencode"
+	}
+
+	return renderMessageModal(
+		"Apply account",
+		fmt.Sprintf("Apply this account to: %s?\n[enter] Confirm   [esc] Cancel", targetLabel),
+		WarningStyle,
+	)
 }
 
 func (m Model) renderInfoModal() string {
@@ -66,9 +152,17 @@ func (m Model) renderInfoModal() string {
 			accountID = account.AccountID
 		}
 		source = account.SourceLabel()
-		if account.AccountID != "" && m.SourcesByAccountID != nil {
-			if sources := m.SourcesByAccountID[account.AccountID]; len(sources) > 0 {
-				source = strings.Join(sources, ", ")
+		if m.SourcesByAccountID != nil {
+			if account.AccountID != "" {
+				if sources := m.SourcesByAccountID[account.AccountID]; len(sources) > 0 {
+					source = strings.Join(sources, ", ")
+				}
+			}
+			if source == account.SourceLabel() && account.Email != "" {
+				emailKey := "email:" + strings.ToLower(strings.TrimSpace(account.Email))
+				if sources := m.SourcesByAccountID[emailKey]; len(sources) > 0 {
+					source = strings.Join(sources, ", ")
+				}
 			}
 		}
 	}

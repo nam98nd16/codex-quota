@@ -13,20 +13,27 @@ func (m Model) View() string {
 	s.WriteString("\n")
 
 	if len(m.Accounts) > 0 {
-		s.WriteString(renderAccountTabs(m.Accounts, m.ActiveAccountIx, m.Width))
-		s.WriteString("\n\n")
+		if !m.CompactMode {
+			s.WriteString(m.renderAccountTabs())
+			s.WriteString("\n\n")
+		} else {
+			s.WriteString("\n")
+		}
 	}
 
-	if m.Loading {
-		s.WriteString("Loading...")
-		s.WriteString("\n")
-	} else if account := m.activeAccount(); account != nil {
-		s.WriteString(m.renderWindowsView())
+	if m.CompactMode {
+		s.WriteString(m.renderCompactView())
 	} else {
-		s.WriteString("\n")
+		if m.Loading {
+			s.WriteString(m.renderWindowsLoadingSkeleton())
+		} else if account := m.activeAccount(); account != nil {
+			s.WriteString(m.renderWindowsView())
+		} else {
+			s.WriteString("\n")
+		}
 	}
 
-	s.WriteString(HelpStyle.Render("\n[r] refresh • [i] additional info • [n] add account • [o] apply to opencode • [x] delete account • [←/→] switch • [q] quit"))
+	s.WriteString(HelpStyle.Render("\n[r] refresh • [R] refresh all • [i] info • [n] add • [enter/o] apply • [x] del • [v] view • [↑↓←→] switch • [q] quit"))
 
 	content := s.String()
 	contentWidth := lipgloss.Width(content)

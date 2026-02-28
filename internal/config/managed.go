@@ -46,6 +46,12 @@ func LoadManagedAccounts() ([]*Account, error) {
 		}
 	}
 
+	if migrated, changed := migrateManagedAccounts(store.Accounts); changed {
+		store.Accounts = migrated
+		// Best-effort persistence for automatic migration; in-memory state continues even if write fails.
+		_ = writeJSONMap(path, map[string]any{"accounts": store.Accounts})
+	}
+
 	accounts := make([]*Account, 0, len(store.Accounts))
 	for _, item := range store.Accounts {
 		if strings.TrimSpace(item.AccessToken) == "" {
@@ -67,9 +73,7 @@ func LoadManagedAccounts() ([]*Account, error) {
 		}
 
 		claims := ParseAccessToken(account.AccessToken)
-		if account.AccountID == "" {
-			account.AccountID = claims.AccountID
-		}
+		account.AccountID = CanonicalAccountID(account.AccountID, claims.AccountID)
 		if account.ClientID == "" {
 			account.ClientID = claims.ClientID
 		}
@@ -97,9 +101,16 @@ func UpsertManagedAccount(account *Account) error {
 	if strings.TrimSpace(account.AccessToken) == "" {
 		return fmt.Errorf("access token is empty")
 	}
-	if strings.TrimSpace(account.AccountID) == "" {
-		claims := ParseAccessToken(account.AccessToken)
-		account.AccountID = claims.AccountID
+	claims := ParseAccessToken(account.AccessToken)
+	account.AccountID = CanonicalAccountID(account.AccountID, claims.AccountID)
+	if account.Email == "" {
+		account.Email = claims.Email
+	}
+	if account.ClientID == "" {
+		account.ClientID = claims.ClientID
+	}
+	if account.ExpiresAt.IsZero() && !claims.ExpiresAt.IsZero() {
+		account.ExpiresAt = claims.ExpiresAt
 	}
 	if strings.TrimSpace(account.AccountID) == "" {
 		return fmt.Errorf("account_id is missing")
@@ -242,13 +253,135 @@ func DeleteManagedAccount(accountID string) error {
 	return writeJSONMap(path, root)
 }
 
+func DeleteManagedAccountByIdentity(account *Account) error {
+	if account == nil {
+		return fmt.Errorf("account is nil")
+	}
+
+	accountID := strings.TrimSpace(account.AccountID)
+	email := normalizeEmail(account.Email)
+	if accountID == "" && email == "" {
+		return fmt.Errorf("account identity is empty")
+	}
+
+	path, err := managedAccountsPath()
+	if err != nil {
+		return err
+	}
+
+	root, err := readJSONMap(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read %s: %w", path, err)
+	}
+
+	store := managedStore{}
+	if rawAccounts, ok := root["accounts"]; ok {
+		store.Accounts, err = decodeManagedAccounts(rawAccounts)
+		if err != nil {
+			return fmt.Errorf("failed to decode accounts in %s: %w", path, err)
+		}
+	}
+
+	filtered := make([]managedAccount, 0, len(store.Accounts))
+	removed := false
+	for _, item := range store.Accounts {
+		itemAccountID := strings.TrimSpace(item.AccountID)
+		itemEmail := normalizeEmail(item.Email)
+		itemCanonicalID := CanonicalAccountID(itemAccountID, ParseAccessToken(strings.TrimSpace(item.AccessToken)).AccountID)
+
+		matchID := accountID != "" && (itemAccountID == accountID || itemCanonicalID == accountID)
+		matchEmail := email != "" && itemEmail == email
+		if matchID || matchEmail {
+			removed = true
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+
+	if !removed {
+		return nil
+	}
+
+	root["accounts"] = filtered
+	return writeJSONMap(path, root)
+}
+
 func ApplyAccountToOpenCode(account *Account) (string, error) {
 	if account == nil {
 		return "", fmt.Errorf("account is nil")
 	}
-	path := opencodeAuthPath()
-	if strings.TrimSpace(path) == "" {
+	paths := opencodeApplyPaths()
+	if len(paths) == 0 {
 		return "", fmt.Errorf("OpenCode auth path is unknown")
+	}
+
+	successPaths := make([]string, 0, len(paths))
+	errorsList := make([]string, 0)
+
+	for _, path := range paths {
+		root, err := readJSONMap(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				root = make(map[string]any)
+			} else {
+				errorsList = append(errorsList, fmt.Sprintf("%s: failed to read: %v", path, err))
+				continue
+			}
+		}
+
+		openai := asMap(root["openai"])
+		if openai == nil {
+			openai = make(map[string]any)
+			root["openai"] = openai
+		}
+
+		openai["access"] = account.AccessToken
+		if account.RefreshToken != "" {
+			openai["refresh"] = account.RefreshToken
+		}
+		if account.AccountID != "" {
+			openai["accountId"] = account.AccountID
+		}
+		if account.Email != "" {
+			openai["email"] = account.Email
+		}
+		if !account.ExpiresAt.IsZero() {
+			openai["expires"] = account.ExpiresAt.UnixMilli()
+		}
+
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			errorsList = append(errorsList, fmt.Sprintf("%s: failed to ensure directory: %v", path, err))
+			continue
+		}
+
+		if err := writeJSONMap(path, root); err != nil {
+			errorsList = append(errorsList, fmt.Sprintf("%s: failed to write: %v", path, err))
+			continue
+		}
+
+		successPaths = append(successPaths, path)
+	}
+
+	if len(successPaths) == 0 {
+		if len(errorsList) > 0 {
+			return "", fmt.Errorf("apply to OpenCode failed: %s", strings.Join(errorsList, "; "))
+		}
+		return "", fmt.Errorf("apply to OpenCode failed: no writable auth path")
+	}
+
+	return successPaths[0], nil
+}
+
+func ApplyAccountToCodex(account *Account) (string, error) {
+	if account == nil {
+		return "", fmt.Errorf("account is nil")
+	}
+	path := codexAuthPath()
+	if strings.TrimSpace(path) == "" {
+		return "", fmt.Errorf("Codex auth path is unknown")
 	}
 
 	root, err := readJSONMap(path)
@@ -260,25 +393,20 @@ func ApplyAccountToOpenCode(account *Account) (string, error) {
 		}
 	}
 
-	openai := asMap(root["openai"])
-	if openai == nil {
-		openai = make(map[string]any)
-		root["openai"] = openai
+	tokens := asMap(root["tokens"])
+	if tokens == nil {
+		tokens = make(map[string]any)
+		root["tokens"] = tokens
 	}
 
-	openai["access"] = account.AccessToken
+	tokens["access_token"] = account.AccessToken
 	if account.RefreshToken != "" {
-		openai["refresh"] = account.RefreshToken
+		tokens["refresh_token"] = account.RefreshToken
 	}
 	if account.AccountID != "" {
-		openai["accountId"] = account.AccountID
+		tokens["account_id"] = account.AccountID
 	}
-	if account.Email != "" {
-		openai["email"] = account.Email
-	}
-	if !account.ExpiresAt.IsZero() {
-		openai["expires"] = account.ExpiresAt.UnixMilli()
-	}
+	root["last_refresh"] = time.Now().UTC().Format(time.RFC3339)
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return "", fmt.Errorf("failed to ensure directory for %s: %w", path, err)
@@ -291,19 +419,135 @@ func ApplyAccountToOpenCode(account *Account) (string, error) {
 	return path, nil
 }
 
-func managedAccountsPath() (string, error) {
-	base, err := os.UserConfigDir()
-	if err != nil || strings.TrimSpace(base) == "" {
-		home, herr := os.UserHomeDir()
-		if herr != nil {
-			return "", fmt.Errorf("failed to locate user config dir")
+func DeleteOpenCodeAuthAccount() error {
+	paths := opencodeExistingPaths()
+	if len(paths) == 0 {
+		if len(opencodeAuthPaths()) == 0 {
+			return fmt.Errorf("OpenCode auth path is unknown")
 		}
-		base = filepath.Join(home, ".config")
+		return nil
 	}
 
-	dir := filepath.Join(base, "codex-quota")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", fmt.Errorf("failed to create config directory %s: %w", dir, err)
+	errorsList := make([]string, 0)
+	for _, path := range paths {
+		root, err := readJSONMap(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			errorsList = append(errorsList, fmt.Sprintf("%s: failed to read: %v", path, err))
+			continue
+		}
+
+		openai := asMap(root["openai"])
+		if openai == nil {
+			continue
+		}
+
+		changed := false
+		changed = deleteMapKey(openai, "access") || changed
+		changed = deleteMapKey(openai, "refresh") || changed
+		changed = deleteMapKey(openai, "accountId") || changed
+		changed = deleteMapKey(openai, "email") || changed
+		changed = deleteMapKey(openai, "expires") || changed
+		if !changed {
+			continue
+		}
+
+		if err := writeJSONMap(path, root); err != nil {
+			errorsList = append(errorsList, fmt.Sprintf("%s: failed to write: %v", path, err))
+			continue
+		}
+	}
+
+	if len(errorsList) > 0 {
+		return fmt.Errorf("delete from OpenCode failed: %s", strings.Join(errorsList, "; "))
+	}
+
+	return nil
+}
+
+func opencodeExistingPaths() []string {
+	paths := opencodeAuthPaths()
+	if len(paths) == 0 {
+		return nil
+	}
+
+	existing := make([]string, 0, len(paths))
+	for _, path := range paths {
+		if path == "" {
+			continue
+		}
+		if _, err := os.Stat(path); err == nil {
+			existing = append(existing, path)
+		}
+	}
+	return existing
+}
+
+func opencodeApplyPaths() []string {
+	existing := opencodeExistingPaths()
+	if len(existing) > 0 {
+		return existing
+	}
+
+	allPaths := opencodeAuthPaths()
+	if len(allPaths) > 0 {
+		return []string{allPaths[0]}
+	}
+
+	path := opencodeAuthPath()
+	if strings.TrimSpace(path) != "" {
+		return []string{path}
+	}
+	return nil
+}
+
+func DeleteCodexAuthAccount() error {
+	path := codexAuthPath()
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("Codex auth path is unknown")
+	}
+
+	root, err := readJSONMap(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read %s: %w", path, err)
+	}
+
+	tokens := asMap(root["tokens"])
+	if tokens == nil {
+		return nil
+	}
+
+	changed := false
+	changed = deleteMapKey(tokens, "access_token") || changed
+	changed = deleteMapKey(tokens, "refresh_token") || changed
+	changed = deleteMapKey(tokens, "account_id") || changed
+	if !changed {
+		return nil
+	}
+
+	return writeJSONMap(path, root)
+}
+
+func deleteMapKey(values map[string]any, key string) bool {
+	if values == nil {
+		return false
+	}
+	if _, ok := values[key]; !ok {
+		return false
+	}
+	delete(values, key)
+	return true
+}
+
+func managedAccountsPath() (string, error) {
+	dir, err := codexQuotaConfigDir()
+	if err != nil {
+		return "", err
 	}
 	return filepath.Join(dir, "accounts.json"), nil
 }
@@ -320,4 +564,93 @@ func decodeManagedAccounts(raw any) ([]managedAccount, error) {
 	}
 
 	return accounts, nil
+}
+
+func migrateManagedAccounts(input []managedAccount) ([]managedAccount, bool) {
+	if len(input) == 0 {
+		return input, false
+	}
+
+	byID := make(map[string]managedAccount, len(input))
+	order := make([]string, 0, len(input))
+	changed := false
+
+	for _, item := range input {
+		normalized := strings.TrimSpace(item.AccountID)
+		accessToken := strings.TrimSpace(item.AccessToken)
+		claims := ParseAccessToken(accessToken)
+		canonicalID := CanonicalAccountID(normalized, claims.AccountID)
+		if canonicalID != normalized {
+			changed = true
+		}
+		item.AccountID = canonicalID
+
+		if item.Email == "" && claims.Email != "" {
+			item.Email = claims.Email
+			changed = true
+		}
+		if shouldReplaceManagedLabelWithEmail(item) {
+			item.Label = strings.TrimSpace(item.Email)
+			changed = true
+		}
+		if item.ClientID == "" && claims.ClientID != "" {
+			item.ClientID = claims.ClientID
+			changed = true
+		}
+		if item.ExpiresAt == 0 && !claims.ExpiresAt.IsZero() {
+			item.ExpiresAt = claims.ExpiresAt.UnixMilli()
+			changed = true
+		}
+
+		key := item.AccountID
+		if key == "" {
+			key = fmt.Sprintf("__empty__:%d", len(order))
+		}
+
+		if existing, ok := byID[key]; ok {
+			merged := mergeManagedAccount(existing, item)
+			if merged != existing {
+				changed = true
+			}
+			byID[key] = merged
+			continue
+		}
+
+		byID[key] = item
+		order = append(order, key)
+	}
+
+	output := make([]managedAccount, 0, len(order))
+	for _, accountID := range order {
+		if account, ok := byID[accountID]; ok {
+			output = append(output, account)
+		}
+	}
+
+	if len(output) != len(input) {
+		changed = true
+	}
+
+	return output, changed
+}
+
+func shouldReplaceManagedLabelWithEmail(item managedAccount) bool {
+	email := strings.TrimSpace(item.Email)
+	if email == "" {
+		return false
+	}
+	label := strings.TrimSpace(item.Label)
+	if label == "" {
+		return true
+	}
+	if strings.EqualFold(label, "n/a") {
+		return true
+	}
+	if strings.HasPrefix(strings.ToLower(label), "auth0|") {
+		return true
+	}
+	if accountID := strings.TrimSpace(item.AccountID); accountID != "" && label == shortAccountID(accountID) {
+		return true
+	}
+	return false
 }

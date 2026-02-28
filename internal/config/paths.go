@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -116,4 +117,33 @@ func uniqueStrings(values []string) []string {
 		result = append(result, value)
 	}
 	return result
+}
+
+func codexQuotaConfigDir() (string, error) {
+	base := strings.TrimSpace(os.Getenv("CQ_CONFIG_HOME"))
+	if base == "" {
+		base = strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME"))
+	}
+
+	if base == "" {
+		userConfigDir, err := os.UserConfigDir()
+		if err == nil && strings.TrimSpace(userConfigDir) != "" {
+			base = userConfigDir
+		}
+	}
+
+	if base == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to locate user config dir")
+		}
+		base = filepath.Join(home, ".config")
+	}
+
+	dir := filepath.Join(base, "codex-quota")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("failed to create config directory %s: %w", dir, err)
+	}
+
+	return dir, nil
 }

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -96,6 +98,86 @@ func shortAccountID(accountID string) string {
 		return trimmed
 	}
 	return trimmed[:6] + "..." + trimmed[len(trimmed)-4:]
+}
+
+func CanonicalAccountID(ids ...string) string {
+	trimmed := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		trimmed = append(trimmed, id)
+	}
+	if len(trimmed) == 0 {
+		return ""
+	}
+
+	for _, id := range trimmed {
+		if isUUIDLike(id) {
+			return id
+		}
+	}
+
+	return trimmed[0]
+}
+
+func normalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
+func ActiveIdentityKeys(account *Account) []string {
+	if account == nil {
+		return nil
+	}
+
+	keys := make([]string, 0, 4)
+	if accountID := strings.TrimSpace(account.AccountID); accountID != "" {
+		keys = append(keys, "account:"+accountID)
+	}
+	if email := normalizeEmail(account.Email); email != "" {
+		keys = append(keys, "email:"+email)
+	}
+	if tokenKey := tokenKey("access", account.AccessToken); tokenKey != "" {
+		keys = append(keys, tokenKey)
+	}
+	if tokenKey := tokenKey("refresh", account.RefreshToken); tokenKey != "" {
+		keys = append(keys, tokenKey)
+	}
+
+	return keys
+}
+
+func tokenKey(prefix, token string) string {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(token))
+	return prefix + ":" + hex.EncodeToString(sum[:8])
+}
+
+func isUUIDLike(value string) bool {
+	if len(value) != 36 {
+		return false
+	}
+	for i, r := range value {
+		switch i {
+		case 8, 13, 18, 23:
+			if r != '-' {
+				return false
+			}
+		default:
+			if !isHexRune(r) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func isHexRune(r rune) bool {
+	return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')
 }
 
 type jsonNumber interface {
