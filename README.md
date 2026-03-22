@@ -2,6 +2,8 @@
 
 A TUI for switching between Codex accounts and monitoring quota usage, written in Go using [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 
+![Screenshot](demo-screenshot.png)
+
 ![Demo](demo.gif)
 
 ## Features
