@@ -56,11 +56,38 @@ func TestParseAccessToken_UsesClientIDClaim(t *testing.T) {
 	}
 }
 
+func TestParseAccessToken_UsesNestedProfileEmail(t *testing.T) {
+	uuid := "98609d8a-85fb-4ff8-aee2-9344e68fbe3f"
+	exp := time.Now().Add(2 * time.Hour).Unix()
+
+	token := makeTestJWT(t, map[string]any{
+		"client_id": "app_EMoamEEZ73f0CkXaXp7hrann",
+		"sub":       "auth0|sub-id",
+		"exp":       exp,
+		"https://api.openai.com/auth": map[string]any{
+			"chatgpt_account_id": uuid,
+			"chatgpt_user_id":    "user-123",
+		},
+		"https://api.openai.com/profile": map[string]any{
+			"email": "ryan@pinescore.com",
+		},
+	})
+
+	claims := ParseAccessToken(token)
+	if claims.Email != "ryan@pinescore.com" {
+		t.Fatalf("expected nested profile email %q, got %q", "ryan@pinescore.com", claims.Email)
+	}
+	if claims.UserID != "user-123" {
+		t.Fatalf("expected nested user id %q, got %q", "user-123", claims.UserID)
+	}
+}
+
 func TestDedupeAccounts_MergesByAccountIDWhenEmailMissingOnOneSide(t *testing.T) {
 	accountID := "98609d8a-85fb-4ff8-aee2-9344e68fbe3f"
 	now := time.Now().UTC()
 
 	codex := &Account{
+		UserID:      "user-1",
 		AccountID:   accountID,
 		Email:       "",
 		AccessToken: "older-token",
@@ -70,6 +97,7 @@ func TestDedupeAccounts_MergesByAccountIDWhenEmailMissingOnOneSide(t *testing.T)
 		FilePath:    "/tmp/codex-auth.json",
 	}
 	managed := &Account{
+		UserID:       "user-1",
 		AccountID:    accountID,
 		Email:        "user@example.com",
 		Label:        "user@example.com",
@@ -175,6 +203,147 @@ func TestMigrateManagedAccounts_CanonicalizesIDAndNormalizesLabel(t *testing.T) 
 	}
 	if got.ExpiresAt == 0 {
 		t.Fatalf("expected expires_at to be backfilled")
+	}
+}
+
+func TestMigrateManagedAccounts_ReplacesStaleEmailAndLabelFromToken(t *testing.T) {
+	uuid := "98609d8a-85fb-4ff8-aee2-9344e68fbe3f"
+	token := makeTestJWT(t, map[string]any{
+		"sub": "auth0|SZltqUcP3OMO8k3f18EOszJr",
+		"https://api.openai.com/auth": map[string]any{
+			"chatgpt_account_id": uuid,
+		},
+		"https://api.openai.com/profile": map[string]any{
+			"email": "ryan@pinescore.com",
+		},
+		"client_id": "app_EMoamEEZ73f0CkXaXp7hrann",
+		"exp":       time.Now().Add(30 * time.Minute).Unix(),
+	})
+
+	input := []managedAccount{
+		{
+			Label:        "pinescore@outlook.com",
+			Email:        "pinescore@outlook.com",
+			AccountID:    uuid,
+			AccessToken:  token,
+			RefreshToken: "refresh-token",
+		},
+	}
+
+	output, changed := migrateManagedAccounts(input)
+	if !changed {
+		t.Fatalf("expected changed=true from migration")
+	}
+	if len(output) != 1 {
+		t.Fatalf("expected 1 output account, got %d", len(output))
+	}
+
+	got := output[0]
+	if got.Email != "ryan@pinescore.com" {
+		t.Fatalf("expected migrated email %q, got %q", "ryan@pinescore.com", got.Email)
+	}
+	if got.Label != "ryan@pinescore.com" {
+		t.Fatalf("expected migrated label %q, got %q", "ryan@pinescore.com", got.Label)
+	}
+}
+
+func TestMergeManagedAccount_ReplacesStaleEmailAndMatchingLabel(t *testing.T) {
+	existing := managedAccount{
+		Label:        "pinescore@outlook.com",
+		Email:        "pinescore@outlook.com",
+		UserID:       "user-old",
+		AccountID:    "98609d8a-85fb-4ff8-aee2-9344e68fbe3f",
+		AccessToken:  "older-token",
+		RefreshToken: "old-refresh",
+		ExpiresAt:    time.Now().UTC().Add(1 * time.Hour).UnixMilli(),
+		ClientID:     "old-client",
+	}
+	incoming := managedAccount{
+		Email:        "ryan@pinescore.com",
+		AccountID:    existing.AccountID,
+		AccessToken:  "newer-token",
+		RefreshToken: "new-refresh",
+		ExpiresAt:    time.Now().UTC().Add(2 * time.Hour).UnixMilli(),
+		ClientID:     "new-client",
+	}
+
+	merged := mergeManagedAccount(existing, incoming)
+	if merged.Email != "ryan@pinescore.com" {
+		t.Fatalf("expected merged email %q, got %q", "ryan@pinescore.com", merged.Email)
+	}
+	if merged.Label != "ryan@pinescore.com" {
+		t.Fatalf("expected merged label %q, got %q", "ryan@pinescore.com", merged.Label)
+	}
+	if merged.AccessToken != "newer-token" {
+		t.Fatalf("expected newer access token, got %q", merged.AccessToken)
+	}
+}
+
+func TestDedupeAccounts_KeepsDistinctUsersWhenAccountIDMatches(t *testing.T) {
+	accountID := "98609d8a-85fb-4ff8-aee2-9344e68fbe3f"
+	deduped := dedupeAccounts([]*Account{
+		{
+			UserID:    "user-1",
+			Email:     "one@example.com",
+			AccountID: accountID,
+			Source:    SourceManaged,
+			Writable:  true,
+		},
+		{
+			UserID:    "user-2",
+			Email:     "two@example.com",
+			AccountID: accountID,
+			Source:    SourceCodex,
+			Writable:  true,
+		},
+	})
+
+	if len(deduped) != 2 {
+		t.Fatalf("expected 2 accounts after dedupe, got %d", len(deduped))
+	}
+}
+
+func TestUpsertManagedAccount_AppendsDistinctUserWithSameAccountID(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("CQ_CONFIG_HOME", tmp)
+
+	accountID := "98609d8a-85fb-4ff8-aee2-9344e68fbe3f"
+	firstToken := makeTestJWT(t, map[string]any{
+		"client_id": "app_EMoamEEZ73f0CkXaXp7hrann",
+		"exp":       time.Now().Add(1 * time.Hour).Unix(),
+		"https://api.openai.com/auth": map[string]any{
+			"chatgpt_account_id": accountID,
+			"chatgpt_user_id":    "user-1",
+		},
+		"https://api.openai.com/profile": map[string]any{
+			"email": "one@example.com",
+		},
+	})
+	secondToken := makeTestJWT(t, map[string]any{
+		"client_id": "app_EMoamEEZ73f0CkXaXp7hrann",
+		"exp":       time.Now().Add(2 * time.Hour).Unix(),
+		"https://api.openai.com/auth": map[string]any{
+			"chatgpt_account_id": accountID,
+			"chatgpt_user_id":    "user-2",
+		},
+		"https://api.openai.com/profile": map[string]any{
+			"email": "two@example.com",
+		},
+	})
+
+	if err := UpsertManagedAccount(&Account{Email: "one@example.com", AccountID: accountID, AccessToken: firstToken}); err != nil {
+		t.Fatalf("upsert first account: %v", err)
+	}
+	if err := UpsertManagedAccount(&Account{Email: "two@example.com", AccountID: accountID, AccessToken: secondToken}); err != nil {
+		t.Fatalf("upsert second account: %v", err)
+	}
+
+	accounts, err := LoadManagedAccounts()
+	if err != nil {
+		t.Fatalf("load managed accounts: %v", err)
+	}
+	if len(accounts) != 2 {
+		t.Fatalf("expected 2 managed accounts, got %d", len(accounts))
 	}
 }
 

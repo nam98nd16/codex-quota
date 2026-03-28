@@ -17,6 +17,7 @@ type managedStore struct {
 type managedAccount struct {
 	Label        string `json:"label,omitempty"`
 	Email        string `json:"email,omitempty"`
+	UserID       string `json:"user_id,omitempty"`
 	AccountID    string `json:"account_id"`
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -60,6 +61,7 @@ func LoadManagedAccounts() ([]*Account, error) {
 		account := &Account{
 			Label:        strings.TrimSpace(item.Label),
 			Email:        strings.TrimSpace(item.Email),
+			UserID:       strings.TrimSpace(item.UserID),
 			AccountID:    strings.TrimSpace(item.AccountID),
 			AccessToken:  strings.TrimSpace(item.AccessToken),
 			RefreshToken: strings.TrimSpace(item.RefreshToken),
@@ -74,6 +76,9 @@ func LoadManagedAccounts() ([]*Account, error) {
 
 		claims := ParseAccessToken(account.AccessToken)
 		account.AccountID = CanonicalAccountID(account.AccountID, claims.AccountID)
+		if account.UserID == "" {
+			account.UserID = normalizeUserID(claims.UserID)
+		}
 		if account.ClientID == "" {
 			account.ClientID = claims.ClientID
 		}
@@ -106,6 +111,9 @@ func UpsertManagedAccount(account *Account) error {
 	if account.Email == "" {
 		account.Email = claims.Email
 	}
+	if account.UserID == "" {
+		account.UserID = normalizeUserID(claims.UserID)
+	}
 	if account.ClientID == "" {
 		account.ClientID = claims.ClientID
 	}
@@ -137,6 +145,7 @@ func UpsertManagedAccount(account *Account) error {
 	item := managedAccount{
 		Label:        strings.TrimSpace(account.Label),
 		Email:        strings.TrimSpace(account.Email),
+		UserID:       strings.TrimSpace(account.UserID),
 		AccountID:    strings.TrimSpace(account.AccountID),
 		AccessToken:  strings.TrimSpace(account.AccessToken),
 		RefreshToken: strings.TrimSpace(account.RefreshToken),
@@ -148,7 +157,7 @@ func UpsertManagedAccount(account *Account) error {
 
 	updated := false
 	for i := range store.Accounts {
-		if strings.TrimSpace(store.Accounts[i].AccountID) == item.AccountID {
+		if managedAccountsMatchByIdentity(store.Accounts[i], item) {
 			store.Accounts[i] = mergeManagedAccount(store.Accounts[i], item)
 			updated = true
 			break
@@ -173,6 +182,15 @@ func mergeManagedAccount(existing, incoming managedAccount) managedAccount {
 	}
 	if strings.TrimSpace(merged.Email) == "" {
 		merged.Email = incoming.Email
+	} else if incomingEmail := strings.TrimSpace(incoming.Email); incomingEmail != "" && normalizeEmail(incomingEmail) != normalizeEmail(merged.Email) {
+		previousEmail := merged.Email
+		merged.Email = incomingEmail
+		if shouldUpdateManagedLabelToEmail(merged, previousEmail) {
+			merged.Label = incomingEmail
+		}
+	}
+	if strings.TrimSpace(merged.UserID) == "" {
+		merged.UserID = incoming.UserID
 	}
 	if strings.TrimSpace(merged.ClientID) == "" {
 		merged.ClientID = incoming.ClientID
@@ -260,7 +278,8 @@ func DeleteManagedAccountByIdentity(account *Account) error {
 
 	accountID := strings.TrimSpace(account.AccountID)
 	email := normalizeEmail(account.Email)
-	if accountID == "" && email == "" {
+	userID := normalizeUserID(account.UserID)
+	if accountID == "" && email == "" && userID == "" {
 		return fmt.Errorf("account identity is empty")
 	}
 
@@ -288,13 +307,7 @@ func DeleteManagedAccountByIdentity(account *Account) error {
 	filtered := make([]managedAccount, 0, len(store.Accounts))
 	removed := false
 	for _, item := range store.Accounts {
-		itemAccountID := strings.TrimSpace(item.AccountID)
-		itemEmail := normalizeEmail(item.Email)
-		itemCanonicalID := CanonicalAccountID(itemAccountID, ParseAccessToken(strings.TrimSpace(item.AccessToken)).AccountID)
-
-		matchID := accountID != "" && (itemAccountID == accountID || itemCanonicalID == accountID)
-		matchEmail := email != "" && itemEmail == email
-		if matchID || matchEmail {
+		if managedAccountMatchesAccount(item, account) {
 			removed = true
 			continue
 		}
@@ -584,12 +597,17 @@ func migrateManagedAccounts(input []managedAccount) ([]managedAccount, bool) {
 			changed = true
 		}
 		item.AccountID = canonicalID
+		if userID := normalizeUserID(claims.UserID); userID != "" && userID != strings.TrimSpace(item.UserID) {
+			item.UserID = userID
+			changed = true
+		}
 
-		if item.Email == "" && claims.Email != "" {
+		previousEmail := item.Email
+		if claims.Email != "" && normalizeEmail(item.Email) != normalizeEmail(claims.Email) {
 			item.Email = claims.Email
 			changed = true
 		}
-		if shouldReplaceManagedLabelWithEmail(item) {
+		if shouldUpdateManagedLabelToEmail(item, previousEmail) {
 			item.Label = strings.TrimSpace(item.Email)
 			changed = true
 		}
@@ -602,7 +620,14 @@ func migrateManagedAccounts(input []managedAccount) ([]managedAccount, bool) {
 			changed = true
 		}
 
-		key := item.AccountID
+		key := ""
+		if userID := normalizeUserID(item.UserID); userID != "" {
+			key = "user:" + userID
+		} else if email := normalizeEmail(item.Email); email != "" {
+			key = "email:" + email
+		} else {
+			key = item.AccountID
+		}
 		if key == "" {
 			key = fmt.Sprintf("__empty__:%d", len(order))
 		}
@@ -651,6 +676,72 @@ func shouldReplaceManagedLabelWithEmail(item managedAccount) bool {
 	}
 	if accountID := strings.TrimSpace(item.AccountID); accountID != "" && label == shortAccountID(accountID) {
 		return true
+	}
+	return false
+}
+
+func shouldUpdateManagedLabelToEmail(item managedAccount, previousEmail string) bool {
+	if shouldReplaceManagedLabelWithEmail(item) {
+		return true
+	}
+	label := normalizeEmail(strings.TrimSpace(item.Label))
+	if label == "" {
+		return false
+	}
+	return previousEmail != "" && label == normalizeEmail(previousEmail)
+}
+
+func managedAccountIdentityKeys(item managedAccount) []string {
+	account := &Account{
+		Email:        strings.TrimSpace(item.Email),
+		UserID:       strings.TrimSpace(item.UserID),
+		AccountID:    strings.TrimSpace(item.AccountID),
+		AccessToken:  strings.TrimSpace(item.AccessToken),
+		RefreshToken: strings.TrimSpace(item.RefreshToken),
+	}
+	claims := ParseAccessToken(account.AccessToken)
+	account.AccountID = CanonicalAccountID(account.AccountID, claims.AccountID)
+	if account.UserID == "" {
+		account.UserID = normalizeUserID(claims.UserID)
+	}
+	if account.Email == "" {
+		account.Email = claims.Email
+	}
+	return accountIdentityKeys(account)
+}
+
+func managedAccountsMatchByIdentity(left, right managedAccount) bool {
+	leftKeys := managedAccountIdentityKeys(left)
+	rightKeys := managedAccountIdentityKeys(right)
+	if len(leftKeys) == 0 || len(rightKeys) == 0 {
+		return false
+	}
+	leftIndex := make(map[string]struct{}, len(leftKeys))
+	for _, key := range leftKeys {
+		leftIndex[key] = struct{}{}
+	}
+	for _, key := range rightKeys {
+		if _, ok := leftIndex[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func managedAccountMatchesAccount(item managedAccount, account *Account) bool {
+	itemKeys := managedAccountIdentityKeys(item)
+	targetKeys := accountIdentityKeys(account)
+	if len(itemKeys) == 0 || len(targetKeys) == 0 {
+		return false
+	}
+	itemIndex := make(map[string]struct{}, len(itemKeys))
+	for _, key := range itemKeys {
+		itemIndex[key] = struct{}{}
+	}
+	for _, key := range targetKeys {
+		if _, ok := itemIndex[key]; ok {
+			return true
+		}
 	}
 	return false
 }

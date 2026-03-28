@@ -17,6 +17,7 @@ type Account struct {
 	Key          string
 	Label        string
 	Email        string
+	UserID       string
 	AccountID    string
 	AccessToken  string
 	RefreshToken string
@@ -30,6 +31,7 @@ type Account struct {
 type AccessTokenClaims struct {
 	ClientID  string
 	AccountID string
+	UserID    string
 	ExpiresAt time.Time
 	Email     string
 }

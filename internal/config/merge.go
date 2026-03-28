@@ -30,11 +30,14 @@ func dedupeAccounts(input []*Account) []*Account {
 }
 
 func dedupeKey(account *Account) string {
-	if account.AccountID != "" {
-		return "account:" + account.AccountID
+	if userID := normalizeUserID(account.UserID); userID != "" {
+		return "user:" + userID
 	}
 	if email := normalizeEmail(account.Email); email != "" {
 		return "email:" + email
+	}
+	if account.AccountID != "" {
+		return "account:" + account.AccountID
 	}
 	if account.RefreshToken != "" {
 		return "refresh:" + account.RefreshToken
@@ -53,6 +56,9 @@ func mergeAccounts(left, right *Account) *Account {
 	merged := *primary
 	if merged.Email == "" {
 		merged.Email = secondary.Email
+	}
+	if merged.UserID == "" {
+		merged.UserID = secondary.UserID
 	}
 	if merged.Label == "" {
 		merged.Label = secondary.Label

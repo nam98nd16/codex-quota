@@ -126,12 +126,44 @@ func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
+func normalizeUserID(userID string) string {
+	return strings.TrimSpace(userID)
+}
+
+func AccountStableKey(account *Account) string {
+	if account == nil {
+		return ""
+	}
+	if userID := normalizeUserID(account.UserID); userID != "" {
+		return "user:" + userID
+	}
+	if email := normalizeEmail(account.Email); email != "" {
+		return "email:" + email
+	}
+	if accountID := strings.TrimSpace(account.AccountID); accountID != "" {
+		return "account:" + accountID
+	}
+	if tokenKey := tokenKey("refresh", account.RefreshToken); tokenKey != "" {
+		return tokenKey
+	}
+	if tokenKey := tokenKey("access", account.AccessToken); tokenKey != "" {
+		return tokenKey
+	}
+	if path := strings.TrimSpace(account.FilePath); path != "" {
+		return "file:" + path
+	}
+	return ""
+}
+
 func ActiveIdentityKeys(account *Account) []string {
 	if account == nil {
 		return nil
 	}
 
-	keys := make([]string, 0, 4)
+	keys := make([]string, 0, 5)
+	if userID := normalizeUserID(account.UserID); userID != "" {
+		keys = append(keys, "user:"+userID)
+	}
 	if accountID := strings.TrimSpace(account.AccountID); accountID != "" {
 		keys = append(keys, "account:"+accountID)
 	}

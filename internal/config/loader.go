@@ -183,6 +183,7 @@ func cloneAsManaged(account *Account) *Account {
 	return &Account{
 		Label:        strings.TrimSpace(account.Label),
 		Email:        strings.TrimSpace(account.Email),
+		UserID:       strings.TrimSpace(account.UserID),
 		AccountID:    CanonicalAccountID(accountID),
 		AccessToken:  accessToken,
 		RefreshToken: strings.TrimSpace(account.RefreshToken),
@@ -272,6 +273,7 @@ func buildOpenAIAccount(openai map[string]any, source Source, path string, writa
 
 	claims := ParseAccessToken(accessToken)
 	account.AccountID = CanonicalAccountID(account.AccountID, claims.AccountID)
+	account.UserID = normalizeUserID(claims.UserID)
 	if account.ClientID == "" {
 		account.ClientID = claims.ClientID
 	}
@@ -317,6 +319,8 @@ func loadCodexAccountFile(path string) (*Account, error) {
 	account.AccountID = CanonicalAccountID(account.AccountID, claims.AccountID)
 	account.ClientID = claims.ClientID
 	account.ExpiresAt = claims.ExpiresAt
+	account.Email = claims.Email
+	account.UserID = normalizeUserID(claims.UserID)
 
 	return account, nil
 }
@@ -392,8 +396,8 @@ func finalizeAccount(account *Account) {
 	}
 
 	if account.Key == "" {
-		if account.AccountID != "" {
-			account.Key = account.AccountID
+		if key := AccountStableKey(account); key != "" {
+			account.Key = key
 		} else {
 			account.Key = fmt.Sprintf("%s:%s", account.Source, filepath.Base(account.FilePath))
 		}
@@ -431,7 +435,14 @@ func accountIdentityKeys(account *Account) []string {
 	if account == nil {
 		return nil
 	}
-	keys := make([]string, 0, 2)
+	keys := make([]string, 0, 3)
+	if userID := normalizeUserID(account.UserID); userID != "" {
+		keys = append(keys, "user:"+userID)
+		if email := normalizeEmail(account.Email); email != "" {
+			keys = append(keys, "email:"+email)
+		}
+		return keys
+	}
 	if email := normalizeEmail(account.Email); email != "" {
 		keys = append(keys, "email:"+email)
 	}

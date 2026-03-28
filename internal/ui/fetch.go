@@ -118,7 +118,7 @@ func FinalizeAddAccountLoginCmd(account *config.Account) tea.Cmd {
 		}
 
 		return AccountsMsg{
-			ActiveKey:               accountSnapshot.AccountID,
+			ActiveKey:               config.AccountStableKey(accountSnapshot),
 			Accounts:                result.Accounts,
 			SourcesByAccountID:      result.SourcesByAccountID,
 			ActiveSourcesByIdentity: result.ActiveSourcesByIdentity,
@@ -265,8 +265,8 @@ func FetchDataCmd(account *config.Account) tea.Cmd {
 		}
 
 		reloadActiveKey := accountKey
-		if strings.TrimSpace(workingAccount.AccountID) != "" {
-			reloadActiveKey = workingAccount.AccountID
+		if key := config.AccountStableKey(&workingAccount); key != "" {
+			reloadActiveKey = key
 		}
 		return DataMsg{
 			AccountKey:      accountKey,
@@ -365,6 +365,9 @@ func (m *Model) applyAccountSnapshot(accountKey string, snapshot *config.Account
 		}
 		if snapshot.AccountID != "" {
 			account.AccountID = snapshot.AccountID
+		}
+		if snapshot.UserID != "" {
+			account.UserID = snapshot.UserID
 		}
 		if snapshot.Email != "" {
 			account.Email = snapshot.Email
