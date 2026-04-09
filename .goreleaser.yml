@@ -41,7 +41,7 @@ changelog:
 
 release:
   github:
-    owner: deLiseLINO
+    owner: nam98nd16
     name: codex-quota
   draft: false
   prerelease: auto
@@ -51,11 +51,11 @@ release:
 brews:
   - name: codex-quota
     repository:
-      owner: deLiseLINO
+      owner: nam98nd16
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
-    homepage: "https://github.com/deLiseLINO/codex-quota"
+    homepage: "https://github.com/nam98nd16/codex-quota"
     description: "Terminal account switcher and quota monitor for Codex/OpenCode"
     license: "MIT"
     test: |
