@@ -660,6 +660,60 @@ func TestRenderCompactView_LoadingAndQueuedShareRowGeometry(t *testing.T) {
 	}
 }
 
+func TestRenderCompactView_ShowsTightestWindowWhen5HourIsLower(t *testing.T) {
+	model := testModelWithWindows([]api.QuotaWindow{
+		{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 85.0, ResetAt: time.Now().Add(24 * time.Hour)},
+		{Label: "5 hour usage limit", WindowSec: 18000, LeftPercent: 20.0, ResetAt: time.Now().Add(45 * time.Minute)},
+	})
+	model.CompactMode = true
+	model.Width = 140
+	model.LoadingMap = map[string]bool{}
+	model.ErrorsMap = map[string]error{}
+	model.UsageData = map[string]api.UsageData{
+		"account-1": {
+			Windows: []api.QuotaWindow{
+				{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 85.0, ResetAt: time.Now().Add(24 * time.Hour)},
+				{Label: "5 hour usage limit", WindowSec: 18000, LeftPercent: 20.0, ResetAt: time.Now().Add(45 * time.Minute)},
+			},
+		},
+	}
+
+	out := ansi.Strip(model.renderCompactView())
+	if !strings.Contains(out, "20%") {
+		t.Fatalf("expected compact view to show tighter 5 hour quota, got:\n%s", out)
+	}
+	if strings.Contains(out, "85%") {
+		t.Fatalf("did not expect compact view to prefer weekly quota when 5 hour is tighter:\n%s", out)
+	}
+}
+
+func TestRenderCompactView_ShowsWeeklyWhenWeeklyIsLower(t *testing.T) {
+	model := testModelWithWindows([]api.QuotaWindow{
+		{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 15.0, ResetAt: time.Now().Add(2 * time.Hour)},
+		{Label: "5 hour usage limit", WindowSec: 18000, LeftPercent: 70.0, ResetAt: time.Now().Add(45 * time.Minute)},
+	})
+	model.CompactMode = true
+	model.Width = 140
+	model.LoadingMap = map[string]bool{}
+	model.ErrorsMap = map[string]error{}
+	model.UsageData = map[string]api.UsageData{
+		"account-1": {
+			Windows: []api.QuotaWindow{
+				{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 15.0, ResetAt: time.Now().Add(2 * time.Hour)},
+				{Label: "5 hour usage limit", WindowSec: 18000, LeftPercent: 70.0, ResetAt: time.Now().Add(45 * time.Minute)},
+			},
+		},
+	}
+
+	out := ansi.Strip(model.renderCompactView())
+	if !strings.Contains(out, "15%") {
+		t.Fatalf("expected compact view to keep weekly quota when it is tighter, got:\n%s", out)
+	}
+	if strings.Contains(out, "70%") {
+		t.Fatalf("did not expect compact view to switch to 5 hour when weekly is tighter:\n%s", out)
+	}
+}
+
 func TestView_DoesNotOverflowViewportWidthOnNarrowScreen(t *testing.T) {
 	model := testModelWithWindows([]api.QuotaWindow{
 		{

@@ -96,15 +96,31 @@ func windowHeader(window api.QuotaWindow) string {
 }
 
 func compactPrimaryWindow(data api.UsageData) (api.QuotaWindow, bool) {
-	for _, window := range data.Windows {
-		if window.WindowSec == 604800 {
-			return window, true
-		}
-	}
 	if len(data.Windows) == 0 {
 		return api.QuotaWindow{}, false
 	}
-	return data.Windows[0], true
+
+	best := data.Windows[0]
+	bestRatio := clampRatio(best.LeftPercent / 100)
+	for _, window := range data.Windows[1:] {
+		ratio := clampRatio(window.LeftPercent / 100)
+		if ratio < bestRatio || (ratio == bestRatio && compactWindowIsTighter(window, best)) {
+			best = window
+			bestRatio = ratio
+		}
+	}
+
+	return best, true
+}
+
+func compactWindowIsTighter(left, right api.QuotaWindow) bool {
+	if left.WindowSec > 0 && right.WindowSec > 0 {
+		return left.WindowSec < right.WindowSec
+	}
+	if left.WindowSec > 0 {
+		return true
+	}
+	return false
 }
 
 func compactPrimaryRatio(data api.UsageData) (float64, bool) {

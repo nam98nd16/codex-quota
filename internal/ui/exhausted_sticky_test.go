@@ -83,6 +83,40 @@ func TestDataMsgSetsExhaustedStickyAtZeroWeeklyAndUnsetsAfterRecovery(t *testing
 	}
 }
 
+func TestDataMsgSetsExhaustedStickyAtZero5HourAndUnsetsAfterRecovery(t *testing.T) {
+	account := &config.Account{Key: "acc-1", Label: "user@example.com", AccountID: "acc-1", Source: config.SourceManaged}
+	m := InitialModel([]*config.Account{account}, map[string][]string{}, map[string][]string{}, true)
+	m.LoadingMap = map[string]bool{"acc-1": true}
+
+	firstUpdated, _ := m.Update(DataMsg{
+		AccountKey: "acc-1",
+		Data: api.UsageData{
+			Windows: []api.QuotaWindow{
+				{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 70, ResetAt: time.Now().Add(24 * time.Hour)},
+				{Label: "5 hour usage limit", WindowSec: 18000, LeftPercent: 0, ResetAt: time.Now().Add(time.Hour)},
+			},
+		},
+	})
+	afterExhausted := firstUpdated.(Model)
+	if !afterExhausted.ExhaustedSticky["acc-1"] {
+		t.Fatalf("expected exhausted sticky to be set at 5 hour 0.0%%")
+	}
+
+	secondUpdated, _ := afterExhausted.Update(DataMsg{
+		AccountKey: "acc-1",
+		Data: api.UsageData{
+			Windows: []api.QuotaWindow{
+				{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 70, ResetAt: time.Now().Add(24 * time.Hour)},
+				{Label: "5 hour usage limit", WindowSec: 18000, LeftPercent: 90, ResetAt: time.Now().Add(time.Hour)},
+			},
+		},
+	})
+	afterRecoveryData := secondUpdated.(Model)
+	if afterRecoveryData.ExhaustedSticky["acc-1"] {
+		t.Fatalf("expected exhausted sticky to be cleared after 5 hour recovery")
+	}
+}
+
 func TestExhaustedStickyPrunedForRemovedAccounts(t *testing.T) {
 	accounts := []*config.Account{
 		{Key: "acc-1", Label: "a@example.com", AccountID: "acc-1", Source: config.SourceManaged},
