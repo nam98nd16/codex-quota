@@ -69,10 +69,7 @@ func (m Model) renderTabsRange(accounts []*config.Account, start, end, activeInd
 
 	for i := start; i < end; i++ {
 		account := accounts[i]
-		label := account.Label
-		if label == "" {
-			label = account.SourceLabel()
-		}
+		label := m.displayAccountLabel(account)
 		subscribed := m.hasSubscription(account)
 		badgesRaw := m.activeSourceBadgesForAccount(account)
 		if badgesRaw != "" {

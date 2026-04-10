@@ -93,10 +93,8 @@ func TestExactActiveIdentityKeys_PrefersUserEmailAndTokenOverSharedAccountID(t *
 
 	got := ExactActiveIdentityKeys(account)
 	want := []string{
-		"user:user-123",
-		"email:user@example.com",
-		tokenKey("access", "access-token"),
-		tokenKey("refresh", "refresh-token"),
+		"user-account:user-123|shared-account-id",
+		"email-account:user@example.com|shared-account-id",
 	}
 
 	if len(got) != len(want) {
@@ -339,6 +337,29 @@ func TestDedupeAccounts_KeepsDistinctUsersWhenAccountIDMatches(t *testing.T) {
 	}
 }
 
+func TestDedupeAccounts_KeepsSameUserWhenAccountIDDiffers(t *testing.T) {
+	deduped := dedupeAccounts([]*Account{
+		{
+			UserID:    "user-1",
+			Email:     "one@example.com",
+			AccountID: "account-a",
+			Source:    SourceManaged,
+			Writable:  true,
+		},
+		{
+			UserID:    "user-1",
+			Email:     "one@example.com",
+			AccountID: "account-b",
+			Source:    SourceCodex,
+			Writable:  true,
+		},
+	})
+
+	if len(deduped) != 2 {
+		t.Fatalf("expected 2 accounts after dedupe, got %d", len(deduped))
+	}
+}
+
 func TestUpsertManagedAccount_AppendsDistinctUserWithSameAccountID(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("CQ_CONFIG_HOME", tmp)
@@ -380,6 +401,52 @@ func TestUpsertManagedAccount_AppendsDistinctUserWithSameAccountID(t *testing.T)
 	}
 	if len(accounts) != 2 {
 		t.Fatalf("expected 2 managed accounts, got %d", len(accounts))
+	}
+}
+
+func TestUpsertManagedAccount_AppendsSameUserWithDifferentAccountID(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("CQ_CONFIG_HOME", tmp)
+
+	firstToken := makeTestJWT(t, map[string]any{
+		"client_id": "app_EMoamEEZ73f0CkXaXp7hrann",
+		"exp":       time.Now().Add(1 * time.Hour).Unix(),
+		"https://api.openai.com/auth": map[string]any{
+			"chatgpt_account_id": "account-a",
+			"chatgpt_user_id":    "user-1",
+		},
+		"https://api.openai.com/profile": map[string]any{
+			"email": "one@example.com",
+		},
+	})
+	secondToken := makeTestJWT(t, map[string]any{
+		"client_id": "app_EMoamEEZ73f0CkXaXp7hrann",
+		"exp":       time.Now().Add(2 * time.Hour).Unix(),
+		"https://api.openai.com/auth": map[string]any{
+			"chatgpt_account_id": "account-b",
+			"chatgpt_user_id":    "user-1",
+		},
+		"https://api.openai.com/profile": map[string]any{
+			"email": "one@example.com",
+		},
+	})
+
+	if err := UpsertManagedAccount(&Account{Email: "one@example.com", AccountID: "account-a", AccessToken: firstToken}); err != nil {
+		t.Fatalf("upsert first account: %v", err)
+	}
+	if err := UpsertManagedAccount(&Account{Email: "one@example.com", AccountID: "account-b", AccessToken: secondToken}); err != nil {
+		t.Fatalf("upsert second account: %v", err)
+	}
+
+	accounts, err := LoadManagedAccounts()
+	if err != nil {
+		t.Fatalf("load managed accounts: %v", err)
+	}
+	if len(accounts) != 2 {
+		t.Fatalf("expected 2 managed accounts, got %d", len(accounts))
+	}
+	if AccountStableKey(accounts[0]) == AccountStableKey(accounts[1]) {
+		t.Fatalf("expected distinct stable keys for different account ids, got %q", AccountStableKey(accounts[0]))
 	}
 }
 

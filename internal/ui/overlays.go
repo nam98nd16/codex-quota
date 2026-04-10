@@ -351,10 +351,7 @@ func (m Model) renderActionMenuModal() string {
 	}
 
 	if account := m.activeAccount(); account != nil {
-		label := account.Label
-		if strings.TrimSpace(label) == "" {
-			label = account.SourceLabel()
-		}
+		label := m.displayAccountLabel(account)
 		lines = append(lines, InfoValueStyle.Render(truncateLabel(label, 44)))
 	}
 	lines = append(lines, "")

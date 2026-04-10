@@ -9,10 +9,11 @@ import (
 	"github.com/deLiseLINO/codex-quota/internal/config"
 )
 
-func TestDeletableSourcesForAccount_UsesEmailFallbackWhenAccountIDDiffers(t *testing.T) {
+func TestDeletableSourcesForAccount_UsesCompositeIdentityKeys(t *testing.T) {
 	account := &config.Account{
 		Key:       "managed:1",
 		Label:     "user@example.com",
+		UserID:    "user-1",
 		Email:     "user@example.com",
 		AccountID: "uuid-in-list",
 		Source:    config.SourceManaged,
@@ -20,7 +21,7 @@ func TestDeletableSourcesForAccount_UsesEmailFallbackWhenAccountIDDiffers(t *tes
 	}
 
 	m := InitialModel([]*config.Account{account}, map[string][]string{
-		"email:user@example.com": []string{"app", "codex"},
+		"user-account:user-1|uuid-in-list": []string{"app", "codex"},
 	}, map[string][]string{}, false)
 
 	got := m.deletableSourcesForAccount(account)
@@ -49,6 +50,28 @@ func TestDeletableSourcesForAccount_UsesActiveIdentityKeysFallback(t *testing.T)
 
 	got := m.deletableSourcesForAccount(account)
 	want := []config.Source{config.SourceOpenCode, config.SourceCodex}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("deletable sources mismatch: got %v, want %v", got, want)
+	}
+}
+
+func TestDeletableSourcesForAccount_DoesNotUseEmailFallbackAcrossAccountIDs(t *testing.T) {
+	account := &config.Account{
+		Key:       "managed:1",
+		Label:     "user@example.com",
+		UserID:    "user-1",
+		Email:     "user@example.com",
+		AccountID: "workspace-account",
+		Source:    config.SourceManaged,
+		Writable:  true,
+	}
+
+	m := InitialModel([]*config.Account{account}, map[string][]string{
+		"email-account:user@example.com|personal-account": []string{"app", "codex"},
+	}, map[string][]string{}, false)
+
+	got := m.deletableSourcesForAccount(account)
+	want := []config.Source{config.SourceManaged}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("deletable sources mismatch: got %v, want %v", got, want)
 	}

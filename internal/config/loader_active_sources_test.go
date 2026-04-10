@@ -34,19 +34,15 @@ func TestLoadAllAccountsWithSources_PopulatesActiveSourcesByIdentity(t *testing.
 		t.Fatalf("load accounts: %v", err)
 	}
 
-	gotByCodexToken := result.ActiveSourcesByIdentity[tokenKey("access", "tok-codex")]
-	wantByCodexToken := []string{"codex"}
-	if !reflect.DeepEqual(gotByCodexToken, wantByCodexToken) {
-		t.Fatalf("active sources by codex token mismatch: got %v, want %v", gotByCodexToken, wantByCodexToken)
+	gotByCodexAccount := result.ActiveSourcesByIdentity["account:acc-123"]
+	wantByCodexAccount := []string{"codex"}
+	if !reflect.DeepEqual(gotByCodexAccount, wantByCodexAccount) {
+		t.Fatalf("active sources by codex account mismatch: got %v, want %v", gotByCodexAccount, wantByCodexAccount)
 	}
 
-	gotByEmail := result.ActiveSourcesByIdentity["email:user@example.com"]
-	wantByEmail := []string{"opencode"}
-	if !reflect.DeepEqual(gotByEmail, wantByEmail) {
-		t.Fatalf("active sources by email mismatch: got %v, want %v", gotByEmail, wantByEmail)
-	}
-
-	if gotByAccount := result.ActiveSourcesByIdentity["account:acc-123"]; gotByAccount != nil {
-		t.Fatalf("expected no shared account-id active match when stronger identity exists, got %v", gotByAccount)
+	gotByEmailAccount := result.ActiveSourcesByIdentity["email-account:user@example.com|acc-123"]
+	wantByEmailAccount := []string{"opencode"}
+	if !reflect.DeepEqual(gotByEmailAccount, wantByEmailAccount) {
+		t.Fatalf("active sources by email+account mismatch: got %v, want %v", gotByEmailAccount, wantByEmailAccount)
 	}
 }

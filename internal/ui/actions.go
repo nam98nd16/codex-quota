@@ -409,11 +409,8 @@ func (m Model) collectKnownSourcesForAccount(account *config.Account) map[config
 	}
 
 	if m.SourcesByAccountID != nil {
-		if accountID := strings.TrimSpace(account.AccountID); accountID != "" {
-			appendLabels(m.SourcesByAccountID[accountID])
-		}
-		if email := strings.ToLower(strings.TrimSpace(account.Email)); email != "" {
-			appendLabels(m.SourcesByAccountID["email:"+email])
+		for _, key := range config.AccountIdentityKeys(account) {
+			appendLabels(m.SourcesByAccountID[key])
 		}
 	}
 

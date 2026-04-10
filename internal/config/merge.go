@@ -30,14 +30,8 @@ func dedupeAccounts(input []*Account) []*Account {
 }
 
 func dedupeKey(account *Account) string {
-	if userID := normalizeUserID(account.UserID); userID != "" {
-		return "user:" + userID
-	}
-	if email := normalizeEmail(account.Email); email != "" {
-		return "email:" + email
-	}
-	if account.AccountID != "" {
-		return "account:" + account.AccountID
+	if keys := AccountIdentityKeys(account); len(keys) > 0 {
+		return keys[0]
 	}
 	if account.RefreshToken != "" {
 		return "refresh:" + account.RefreshToken

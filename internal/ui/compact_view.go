@@ -77,10 +77,7 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 		prefix = "> "
 	}
 
-	name := acc.Label
-	if name == "" {
-		name = acc.SourceLabel()
-	}
+	name := m.displayAccountLabel(acc)
 	subscribed := m.hasSubscription(acc)
 	badgeWidth := m.activeSourceBadgesDisplayWidth(acc)
 	nameWidth := accountWidth

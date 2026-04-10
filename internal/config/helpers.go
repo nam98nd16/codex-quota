@@ -134,14 +134,8 @@ func AccountStableKey(account *Account) string {
 	if account == nil {
 		return ""
 	}
-	if userID := normalizeUserID(account.UserID); userID != "" {
-		return "user:" + userID
-	}
-	if email := normalizeEmail(account.Email); email != "" {
-		return "email:" + email
-	}
-	if accountID := strings.TrimSpace(account.AccountID); accountID != "" {
-		return "account:" + accountID
+	if keys := AccountIdentityKeys(account); len(keys) > 0 {
+		return keys[0]
 	}
 	if tokenKey := tokenKey("refresh", account.RefreshToken); tokenKey != "" {
 		return tokenKey
@@ -155,21 +149,50 @@ func AccountStableKey(account *Account) string {
 	return ""
 }
 
+func AccountIdentityKeys(account *Account) []string {
+	if account == nil {
+		return nil
+	}
+
+	accountID := strings.TrimSpace(account.AccountID)
+	userID := normalizeUserID(account.UserID)
+	email := normalizeEmail(account.Email)
+
+	keys := make([]string, 0, 2)
+	switch {
+	case accountID != "" && userID != "":
+		keys = append(keys, "user-account:"+userID+"|"+accountID)
+		if email != "" {
+			keys = append(keys, "email-account:"+email+"|"+accountID)
+		}
+		return keys
+	case accountID != "" && email != "":
+		return []string{"email-account:" + email + "|" + accountID}
+	case userID != "":
+		keys = append(keys, "user:"+userID)
+		if email != "" {
+			keys = append(keys, "email:"+email)
+		}
+		return keys
+	case email != "":
+		return []string{"email:" + email}
+	case accountID != "":
+		return []string{"account:" + accountID}
+	default:
+		return nil
+	}
+}
+
 func ActiveIdentityKeys(account *Account) []string {
 	if account == nil {
 		return nil
 	}
 
-	keys := make([]string, 0, 5)
-	if userID := normalizeUserID(account.UserID); userID != "" {
-		keys = append(keys, "user:"+userID)
+	if keys := AccountIdentityKeys(account); len(keys) > 0 {
+		return keys
 	}
-	if accountID := strings.TrimSpace(account.AccountID); accountID != "" {
-		keys = append(keys, "account:"+accountID)
-	}
-	if email := normalizeEmail(account.Email); email != "" {
-		keys = append(keys, "email:"+email)
-	}
+
+	keys := make([]string, 0, 2)
 	if tokenKey := tokenKey("access", account.AccessToken); tokenKey != "" {
 		keys = append(keys, tokenKey)
 	}
@@ -181,32 +204,7 @@ func ActiveIdentityKeys(account *Account) []string {
 }
 
 func ExactActiveIdentityKeys(account *Account) []string {
-	if account == nil {
-		return nil
-	}
-
-	keys := make([]string, 0, 4)
-	if userID := normalizeUserID(account.UserID); userID != "" {
-		keys = append(keys, "user:"+userID)
-	}
-	if email := normalizeEmail(account.Email); email != "" {
-		keys = append(keys, "email:"+email)
-	}
-	if tokenKey := tokenKey("access", account.AccessToken); tokenKey != "" {
-		keys = append(keys, tokenKey)
-	}
-	if tokenKey := tokenKey("refresh", account.RefreshToken); tokenKey != "" {
-		keys = append(keys, tokenKey)
-	}
-	if len(keys) > 0 {
-		return keys
-	}
-
-	if accountID := strings.TrimSpace(account.AccountID); accountID != "" {
-		return []string{"account:" + accountID}
-	}
-
-	return nil
+	return ActiveIdentityKeys(account)
 }
 
 func tokenKey(prefix, token string) string {

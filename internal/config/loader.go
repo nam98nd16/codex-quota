@@ -62,12 +62,8 @@ func LoadAllAccountsWithSources() (AccountsLoadResult, error) {
 		if account == nil {
 			continue
 		}
-		if account.AccountID != "" {
-			sourcesByAccountID[account.AccountID] = appendUniqueString(sourcesByAccountID[account.AccountID], account.SourceLabel())
-		}
-		if email := normalizeEmail(account.Email); email != "" {
-			emailKey := "email:" + email
-			sourcesByAccountID[emailKey] = appendUniqueString(sourcesByAccountID[emailKey], account.SourceLabel())
+		for _, key := range AccountIdentityKeys(account) {
+			sourcesByAccountID[key] = appendUniqueString(sourcesByAccountID[key], account.SourceLabel())
 		}
 	}
 
@@ -81,7 +77,17 @@ func LoadAllAccountsWithSources() (AccountsLoadResult, error) {
 	}
 
 	sort.Slice(accounts, func(i, j int) bool {
-		return strings.ToLower(accounts[i].Label) < strings.ToLower(accounts[j].Label)
+		leftLabel := strings.ToLower(accounts[i].Label)
+		rightLabel := strings.ToLower(accounts[j].Label)
+		if leftLabel != rightLabel {
+			return leftLabel < rightLabel
+		}
+		leftAccountID := strings.TrimSpace(accounts[i].AccountID)
+		rightAccountID := strings.TrimSpace(accounts[j].AccountID)
+		if leftAccountID != rightAccountID {
+			return leftAccountID < rightAccountID
+		}
+		return strings.TrimSpace(accounts[i].UserID) < strings.TrimSpace(accounts[j].UserID)
 	})
 
 	return AccountsLoadResult{
@@ -116,7 +122,7 @@ func syncExternalAccountsToManaged(managedAccounts []*Account, externalAccounts 
 		if account == nil {
 			continue
 		}
-		for _, key := range accountIdentityKeys(account) {
+		for _, key := range AccountIdentityKeys(account) {
 			managedByIdentity[key] = account
 		}
 	}
@@ -141,7 +147,7 @@ func syncExternalAccountsToManaged(managedAccounts []*Account, externalAccounts 
 		if existing != nil {
 			merged = mergeAccounts(existing, imported)
 		}
-		for _, key := range accountIdentityKeys(merged) {
+		for _, key := range AccountIdentityKeys(merged) {
 			managedByIdentity[key] = merged
 		}
 		updated = true
@@ -431,29 +437,8 @@ func shouldReplaceLabelWithEmail(account *Account) bool {
 	return false
 }
 
-func accountIdentityKeys(account *Account) []string {
-	if account == nil {
-		return nil
-	}
-	keys := make([]string, 0, 3)
-	if userID := normalizeUserID(account.UserID); userID != "" {
-		keys = append(keys, "user:"+userID)
-		if email := normalizeEmail(account.Email); email != "" {
-			keys = append(keys, "email:"+email)
-		}
-		return keys
-	}
-	if email := normalizeEmail(account.Email); email != "" {
-		keys = append(keys, "email:"+email)
-	}
-	if accountID := strings.TrimSpace(account.AccountID); accountID != "" {
-		keys = append(keys, "account:"+accountID)
-	}
-	return keys
-}
-
 func findManagedByIdentity(index map[string]*Account, account *Account) *Account {
-	for _, key := range accountIdentityKeys(account) {
+	for _, key := range AccountIdentityKeys(account) {
 		if current, ok := index[key]; ok {
 			return current
 		}

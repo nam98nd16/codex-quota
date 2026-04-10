@@ -93,7 +93,17 @@ func LoadManagedAccounts() ([]*Account, error) {
 	}
 
 	sort.Slice(accounts, func(i, j int) bool {
-		return strings.ToLower(accounts[i].Label) < strings.ToLower(accounts[j].Label)
+		leftLabel := strings.ToLower(accounts[i].Label)
+		rightLabel := strings.ToLower(accounts[j].Label)
+		if leftLabel != rightLabel {
+			return leftLabel < rightLabel
+		}
+		leftAccountID := strings.TrimSpace(accounts[i].AccountID)
+		rightAccountID := strings.TrimSpace(accounts[j].AccountID)
+		if leftAccountID != rightAccountID {
+			return leftAccountID < rightAccountID
+		}
+		return strings.TrimSpace(accounts[i].UserID) < strings.TrimSpace(accounts[j].UserID)
 	})
 
 	return accounts, nil
@@ -621,12 +631,9 @@ func migrateManagedAccounts(input []managedAccount) ([]managedAccount, bool) {
 		}
 
 		key := ""
-		if userID := normalizeUserID(item.UserID); userID != "" {
-			key = "user:" + userID
-		} else if email := normalizeEmail(item.Email); email != "" {
-			key = "email:" + email
-		} else {
-			key = item.AccountID
+		identityKeys := managedAccountIdentityKeys(item)
+		if len(identityKeys) > 0 {
+			key = identityKeys[0]
 		}
 		if key == "" {
 			key = fmt.Sprintf("__empty__:%d", len(order))
@@ -646,8 +653,8 @@ func migrateManagedAccounts(input []managedAccount) ([]managedAccount, bool) {
 	}
 
 	output := make([]managedAccount, 0, len(order))
-	for _, accountID := range order {
-		if account, ok := byID[accountID]; ok {
+	for _, key := range order {
+		if account, ok := byID[key]; ok {
 			output = append(output, account)
 		}
 	}
@@ -707,7 +714,7 @@ func managedAccountIdentityKeys(item managedAccount) []string {
 	if account.Email == "" {
 		account.Email = claims.Email
 	}
-	return accountIdentityKeys(account)
+	return AccountIdentityKeys(account)
 }
 
 func managedAccountsMatchByIdentity(left, right managedAccount) bool {
@@ -730,7 +737,7 @@ func managedAccountsMatchByIdentity(left, right managedAccount) bool {
 
 func managedAccountMatchesAccount(item managedAccount, account *Account) bool {
 	itemKeys := managedAccountIdentityKeys(item)
-	targetKeys := accountIdentityKeys(account)
+	targetKeys := AccountIdentityKeys(account)
 	if len(itemKeys) == 0 || len(targetKeys) == 0 {
 		return false
 	}

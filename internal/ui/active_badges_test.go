@@ -22,7 +22,7 @@ func TestActiveSourceBadgesForAccount(t *testing.T) {
 	}
 
 	m := InitialModel([]*config.Account{account}, map[string][]string{}, map[string][]string{
-		"email:user@example.com": []string{"codex", "opencode"},
+		"email-account:user@example.com|acc-1": []string{"codex", "opencode"},
 	}, false)
 
 	if got := m.activeSourceBadgesForAccount(account); got != "C•O" {
@@ -41,7 +41,7 @@ func TestRenderAccountTabs_ShowsActiveBadges(t *testing.T) {
 	}
 
 	m := InitialModel([]*config.Account{account}, map[string][]string{}, map[string][]string{
-		"email:user@example.com": []string{"codex"},
+		"email-account:user@example.com|acc-1": []string{"codex"},
 	}, false)
 
 	out := ansi.Strip(m.renderAccountTabs())
@@ -61,7 +61,7 @@ func TestRenderCompactView_ShowsActiveBadges(t *testing.T) {
 	}
 
 	m := InitialModel([]*config.Account{account}, map[string][]string{}, map[string][]string{
-		"email:user@example.com": []string{"opencode"},
+		"email-account:user@example.com|acc-1": []string{"opencode"},
 	}, true)
 	m.Loading = false
 	m.Width = 120
@@ -123,7 +123,7 @@ func TestActiveSourceBadgesDisplayWidth_IncludesBrackets(t *testing.T) {
 		Source:    config.SourceManaged,
 	}
 	m := InitialModel([]*config.Account{account}, map[string][]string{}, map[string][]string{
-		"email:user@example.com": []string{"codex", "opencode"},
+		"email-account:user@example.com|acc-3": []string{"codex", "opencode"},
 	}, false)
 
 	if got := m.activeSourceBadgesDisplayWidth(account); got != 5 {
@@ -174,5 +174,50 @@ func TestActiveSourceBadgesForAccount_DoesNotMatchSharedAccountIDWhenUserDiffers
 	}
 	if got := m.activeSourceBadgesForAccount(differentUserSameAccount); got != "" {
 		t.Fatalf("expected no badge for different user sharing account id, got %q", got)
+	}
+}
+
+func TestActiveSourceBadgesForAccount_DoesNotMatchSameUserWhenAccountDiffers(t *testing.T) {
+	activeAccount := &config.Account{
+		Label:        "user@example.com",
+		Email:        "user@example.com",
+		UserID:       "user-1",
+		AccountID:    "account-a",
+		AccessToken:  "active-token",
+		RefreshToken: "active-refresh",
+	}
+	activeMap := map[string][]string{}
+	for _, key := range config.ExactActiveIdentityKeys(activeAccount) {
+		activeMap[key] = []string{"codex", "opencode"}
+	}
+
+	activeRow := &config.Account{
+		Key:          "active",
+		Label:        "user@example.com",
+		Email:        "user@example.com",
+		UserID:       "user-1",
+		AccountID:    "account-a",
+		AccessToken:  "active-token",
+		RefreshToken: "active-refresh",
+		Source:       config.SourceManaged,
+	}
+	differentWorkspace := &config.Account{
+		Key:          "workspace",
+		Label:        "user@example.com",
+		Email:        "user@example.com",
+		UserID:       "user-1",
+		AccountID:    "account-b",
+		AccessToken:  "workspace-token",
+		RefreshToken: "workspace-refresh",
+		Source:       config.SourceManaged,
+	}
+
+	m := InitialModel([]*config.Account{activeRow, differentWorkspace}, map[string][]string{}, activeMap, false)
+
+	if got := m.activeSourceBadgesForAccount(activeRow); got != "C•O" {
+		t.Fatalf("expected active row badges %q, got %q", "C•O", got)
+	}
+	if got := m.activeSourceBadgesForAccount(differentWorkspace); got != "" {
+		t.Fatalf("expected no badge for same user on another account id, got %q", got)
 	}
 }
