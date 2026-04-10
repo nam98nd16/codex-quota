@@ -180,6 +180,35 @@ func ActiveIdentityKeys(account *Account) []string {
 	return keys
 }
 
+func ExactActiveIdentityKeys(account *Account) []string {
+	if account == nil {
+		return nil
+	}
+
+	keys := make([]string, 0, 4)
+	if userID := normalizeUserID(account.UserID); userID != "" {
+		keys = append(keys, "user:"+userID)
+	}
+	if email := normalizeEmail(account.Email); email != "" {
+		keys = append(keys, "email:"+email)
+	}
+	if tokenKey := tokenKey("access", account.AccessToken); tokenKey != "" {
+		keys = append(keys, tokenKey)
+	}
+	if tokenKey := tokenKey("refresh", account.RefreshToken); tokenKey != "" {
+		keys = append(keys, tokenKey)
+	}
+	if len(keys) > 0 {
+		return keys
+	}
+
+	if accountID := strings.TrimSpace(account.AccountID); accountID != "" {
+		return []string{"account:" + accountID}
+	}
+
+	return nil
+}
+
 func tokenKey(prefix, token string) string {
 	token = strings.TrimSpace(token)
 	if token == "" {

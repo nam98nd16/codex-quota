@@ -100,7 +100,7 @@ func appendActiveSource(target map[string][]string, account *Account, source Sou
 	}
 
 	sourceLabel := string(source)
-	for _, key := range ActiveIdentityKeys(account) {
+	for _, key := range ExactActiveIdentityKeys(account) {
 		target[key] = appendUniqueString(target[key], sourceLabel)
 	}
 }

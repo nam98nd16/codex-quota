@@ -22,7 +22,7 @@ func TestActiveSourceBadgesForAccount(t *testing.T) {
 	}
 
 	m := InitialModel([]*config.Account{account}, map[string][]string{}, map[string][]string{
-		"account:acc-1": []string{"codex", "opencode"},
+		"email:user@example.com": []string{"codex", "opencode"},
 	}, false)
 
 	if got := m.activeSourceBadgesForAccount(account); got != "C•O" {
@@ -41,7 +41,7 @@ func TestRenderAccountTabs_ShowsActiveBadges(t *testing.T) {
 	}
 
 	m := InitialModel([]*config.Account{account}, map[string][]string{}, map[string][]string{
-		"account:acc-1": []string{"codex"},
+		"email:user@example.com": []string{"codex"},
 	}, false)
 
 	out := ansi.Strip(m.renderAccountTabs())
@@ -61,7 +61,7 @@ func TestRenderCompactView_ShowsActiveBadges(t *testing.T) {
 	}
 
 	m := InitialModel([]*config.Account{account}, map[string][]string{}, map[string][]string{
-		"account:acc-1": []string{"opencode"},
+		"email:user@example.com": []string{"opencode"},
 	}, true)
 	m.Loading = false
 	m.Width = 120
@@ -98,7 +98,7 @@ func TestActiveSourceBadgesForAccount_MatchesByTokenFallback(t *testing.T) {
 	activeAccount := &config.Account{
 		AccessToken: "same-access-token",
 	}
-	keys := config.ActiveIdentityKeys(activeAccount)
+	keys := config.ExactActiveIdentityKeys(activeAccount)
 	if len(keys) == 0 {
 		t.Fatalf("expected non-empty active identity keys for token")
 	}
@@ -118,14 +118,61 @@ func TestActiveSourceBadgesDisplayWidth_IncludesBrackets(t *testing.T) {
 	account := &config.Account{
 		Key:       "acc-3",
 		Label:     "user@example.com",
+		Email:     "user@example.com",
 		AccountID: "acc-3",
 		Source:    config.SourceManaged,
 	}
 	m := InitialModel([]*config.Account{account}, map[string][]string{}, map[string][]string{
-		"account:acc-3": []string{"codex", "opencode"},
+		"email:user@example.com": []string{"codex", "opencode"},
 	}, false)
 
 	if got := m.activeSourceBadgesDisplayWidth(account); got != 5 {
 		t.Fatalf("expected display width 5 for [C•O], got %d", got)
+	}
+}
+
+func TestActiveSourceBadgesForAccount_DoesNotMatchSharedAccountIDWhenUserDiffers(t *testing.T) {
+	sharedAccountID := "shared-account-id"
+	activeAccount := &config.Account{
+		Label:        "active@example.com",
+		Email:        "active@example.com",
+		UserID:       "user-active",
+		AccountID:    sharedAccountID,
+		AccessToken:  "active-token",
+		RefreshToken: "active-refresh",
+	}
+	activeMap := map[string][]string{}
+	for _, key := range config.ExactActiveIdentityKeys(activeAccount) {
+		activeMap[key] = []string{"codex", "opencode"}
+	}
+
+	activeRow := &config.Account{
+		Key:          "active",
+		Label:        "active@example.com",
+		Email:        "active@example.com",
+		UserID:       "user-active",
+		AccountID:    sharedAccountID,
+		AccessToken:  "active-token",
+		RefreshToken: "active-refresh",
+		Source:       config.SourceManaged,
+	}
+	differentUserSameAccount := &config.Account{
+		Key:          "other",
+		Label:        "other@example.com",
+		Email:        "other@example.com",
+		UserID:       "user-other",
+		AccountID:    sharedAccountID,
+		AccessToken:  "other-token",
+		RefreshToken: "other-refresh",
+		Source:       config.SourceManaged,
+	}
+
+	m := InitialModel([]*config.Account{activeRow, differentUserSameAccount}, map[string][]string{}, activeMap, false)
+
+	if got := m.activeSourceBadgesForAccount(activeRow); got != "C•O" {
+		t.Fatalf("expected active row badges %q, got %q", "C•O", got)
+	}
+	if got := m.activeSourceBadgesForAccount(differentUserSameAccount); got != "" {
+		t.Fatalf("expected no badge for different user sharing account id, got %q", got)
 	}
 }

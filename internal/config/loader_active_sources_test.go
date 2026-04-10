@@ -34,15 +34,19 @@ func TestLoadAllAccountsWithSources_PopulatesActiveSourcesByIdentity(t *testing.
 		t.Fatalf("load accounts: %v", err)
 	}
 
-	gotByAccount := result.ActiveSourcesByIdentity["account:acc-123"]
-	wantByAccount := []string{"codex", "opencode"}
-	if !reflect.DeepEqual(gotByAccount, wantByAccount) {
-		t.Fatalf("active sources by account mismatch: got %v, want %v", gotByAccount, wantByAccount)
+	gotByCodexToken := result.ActiveSourcesByIdentity[tokenKey("access", "tok-codex")]
+	wantByCodexToken := []string{"codex"}
+	if !reflect.DeepEqual(gotByCodexToken, wantByCodexToken) {
+		t.Fatalf("active sources by codex token mismatch: got %v, want %v", gotByCodexToken, wantByCodexToken)
 	}
 
 	gotByEmail := result.ActiveSourcesByIdentity["email:user@example.com"]
 	wantByEmail := []string{"opencode"}
 	if !reflect.DeepEqual(gotByEmail, wantByEmail) {
 		t.Fatalf("active sources by email mismatch: got %v, want %v", gotByEmail, wantByEmail)
+	}
+
+	if gotByAccount := result.ActiveSourcesByIdentity["account:acc-123"]; gotByAccount != nil {
+		t.Fatalf("expected no shared account-id active match when stronger identity exists, got %v", gotByAccount)
 	}
 }

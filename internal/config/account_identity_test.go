@@ -82,6 +82,42 @@ func TestParseAccessToken_UsesNestedProfileEmail(t *testing.T) {
 	}
 }
 
+func TestExactActiveIdentityKeys_PrefersUserEmailAndTokenOverSharedAccountID(t *testing.T) {
+	account := &Account{
+		UserID:       "user-123",
+		Email:        "User@example.com",
+		AccountID:    "shared-account-id",
+		AccessToken:  "access-token",
+		RefreshToken: "refresh-token",
+	}
+
+	got := ExactActiveIdentityKeys(account)
+	want := []string{
+		"user:user-123",
+		"email:user@example.com",
+		tokenKey("access", "access-token"),
+		tokenKey("refresh", "refresh-token"),
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("expected %d identity keys, got %d: %v", len(want), len(got), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("expected key %d to be %q, got %q", i, want[i], got[i])
+		}
+	}
+}
+
+func TestExactActiveIdentityKeys_FallsBackToAccountID(t *testing.T) {
+	account := &Account{AccountID: "shared-account-id"}
+
+	got := ExactActiveIdentityKeys(account)
+	if len(got) != 1 || got[0] != "account:shared-account-id" {
+		t.Fatalf("expected account fallback key, got %v", got)
+	}
+}
+
 func TestDedupeAccounts_MergesByAccountIDWhenEmailMissingOnOneSide(t *testing.T) {
 	accountID := "98609d8a-85fb-4ff8-aee2-9344e68fbe3f"
 	now := time.Now().UTC()
