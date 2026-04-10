@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/deLiseLINO/codex-quota/internal/api"
 	"github.com/deLiseLINO/codex-quota/internal/config"
 )
 
@@ -111,7 +112,7 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 	}
 	s.WriteString(" ")
 
-	if err := m.ErrorsMap[acc.Key]; err != nil {
+	if err := m.ErrorsMap[acc.Key]; err != nil && !(m.BackgroundErrorMap[acc.Key] && hasRenderableQuotaData(m.UsageData[acc.Key])) {
 		status := truncateLabel("Error: "+err.Error(), 24)
 		s.WriteString(m.renderCompactStatusRow(status, subscribed, barWidth, percentWidth, resetWidth))
 		return s.String()
@@ -134,7 +135,8 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 	}
 
 	ratio := m.compactBarRatio(acc.Key, clampRatio(window.LeftPercent/100))
-	s.WriteString(renderSmoothBar(barWidth, ratio, defaultBarGradientStart, defaultBarGradientEnd))
+	gradientStart, gradientEnd := barGradientForWindow(window.WindowSec)
+	s.WriteString(renderSmoothBar(barWidth, ratio, gradientStart, gradientEnd))
 	s.WriteString(" ")
 	s.WriteString(m.renderCompactPercent(fmt.Sprintf("%.0f%%", window.LeftPercent), subscribed, percentWidth))
 	reset := truncateLabelStrict(formatResetText(window.ResetAt), resetWidth)
@@ -154,15 +156,18 @@ func (m Model) isCompactAccountExhausted(accountKey string) bool {
 	if m.LoadingMap[accountKey] {
 		return false
 	}
-	if err := m.ErrorsMap[accountKey]; err != nil {
-		return false
-	}
-
 	data, ok := m.UsageData[accountKey]
 	if !ok {
 		return false
 	}
+	if err := m.ErrorsMap[accountKey]; err != nil && !(m.BackgroundErrorMap[accountKey] && hasRenderableQuotaData(data)) {
+		return false
+	}
 	return isConfirmedExhausted(data)
+}
+
+func hasRenderableQuotaData(data api.UsageData) bool {
+	return len(data.Windows) > 0
 }
 
 func (m Model) renderCompactStatusRow(status string, subscribed bool, barWidth, percentWidth, resetWidth int) string {

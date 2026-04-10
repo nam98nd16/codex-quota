@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -40,6 +41,9 @@ func (m Model) confirmActionMenu() (tea.Model, tea.Cmd) {
 		return m.beginAddAccount()
 	case actionMenuView:
 		return m.toggleViewMode()
+	case actionMenuSettings:
+		m.openSettingsOverlay()
+		return m, nil
 	case actionMenuDelete:
 		return m.beginDeleteFlow()
 	case actionMenuUpdate:
@@ -53,6 +57,7 @@ func (m Model) confirmActionMenu() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) openHelpOverlay() {
+	m.resetSettingsState()
 	m.resetActionMenuState()
 	m.resetDeleteState()
 	m.resetApplyState()
@@ -68,6 +73,7 @@ func (m *Model) resetHelpState() {
 
 func (m *Model) openActionMenu() {
 	m.resetHelpState()
+	m.resetSettingsState()
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.ShowInfo = false
@@ -89,6 +95,7 @@ func (m *Model) openUpdatePrompt() bool {
 	m.UpdatePromptVisible = true
 	m.UpdatePromptCursor = 0
 	m.resetHelpState()
+	m.resetSettingsState()
 	m.resetActionMenuState()
 	m.ShowInfo = false
 	m.Notice = ""
@@ -109,6 +116,7 @@ func (m Model) beginDeleteFlow() (tea.Model, tea.Cmd) {
 	if !account.Writable {
 		m.resetActionMenuState()
 		m.resetHelpState()
+		m.resetSettingsState()
 		m.resetDeleteState()
 		m.resetApplyState()
 		m.ShowInfo = false
@@ -148,6 +156,7 @@ func (m Model) beginRefreshActive() (tea.Model, tea.Cmd) {
 	m.Err = nil
 	m.resetHelpState()
 	m.resetActionMenuState()
+	m.resetSettingsState()
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.Notice = ""
@@ -157,6 +166,9 @@ func (m Model) beginRefreshActive() (tea.Model, tea.Cmd) {
 	}
 	delete(m.UsageData, m.activeAccountKey())
 	delete(m.ErrorsMap, m.activeAccountKey())
+	delete(m.BackgroundErrorMap, m.activeAccountKey())
+	delete(m.BackgroundLoadingMap, m.activeAccountKey())
+	delete(m.AutoRefreshPending, m.activeAccountKey())
 	delete(m.compactBarAnimations, m.activeAccountKey())
 	m.clearTabWindowAnimations()
 	return m, m.fetchNextCmd()
@@ -167,6 +179,7 @@ func (m Model) beginRefreshAll() (tea.Model, tea.Cmd) {
 	m.Err = nil
 	m.resetHelpState()
 	m.resetActionMenuState()
+	m.resetSettingsState()
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.Notice = ""
@@ -174,6 +187,10 @@ func (m Model) beginRefreshAll() (tea.Model, tea.Cmd) {
 	m.UsageData = make(map[string]api.UsageData)
 	m.ErrorsMap = make(map[string]error)
 	m.LoadingMap = make(map[string]bool)
+	m.BackgroundLoadingMap = make(map[string]bool)
+	m.BackgroundErrorMap = make(map[string]bool)
+	m.AutoRefreshPending = make(map[string]bool)
+	m.LastQuotaFetchAt = make(map[string]time.Time)
 	m.compactBarAnimations = make(map[string]compactBarAnimation)
 	m.tabWindowAnimations = make(map[string]tabWindowAnimation)
 	m.animationTicking = false
@@ -190,6 +207,7 @@ func (m Model) toggleViewMode() (tea.Model, tea.Cmd) {
 	}
 	m.resetHelpState()
 	m.resetActionMenuState()
+	m.resetSettingsState()
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.Notice = ""
@@ -204,6 +222,7 @@ func (m Model) beginAddAccount() (tea.Model, tea.Cmd) {
 	m.Err = nil
 	m.resetHelpState()
 	m.resetActionMenuState()
+	m.resetSettingsState()
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.ShowInfo = false

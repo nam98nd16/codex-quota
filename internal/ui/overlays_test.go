@@ -129,7 +129,7 @@ func TestRenderActionMenuModalListsPrimaryActions(t *testing.T) {
 	if !strings.Contains(out, "Apply to Codex/OpenCode") || !strings.Contains(out, "Delete account") {
 		t.Fatalf("expected account actions in menu:\n%s", out)
 	}
-	if !strings.Contains(out, "Refresh all") || !strings.Contains(out, "Switch view") || !strings.Contains(out, "Add account") {
+	if !strings.Contains(out, "Refresh all") || !strings.Contains(out, "Switch view") || !strings.Contains(out, "Add account") || !strings.Contains(out, "Settings") {
 		t.Fatalf("expected global actions in menu:\n%s", out)
 	}
 	if !strings.Contains(out, "1. Apply to Codex/OpenCode") || !strings.Contains(out, "5. Refresh all") {

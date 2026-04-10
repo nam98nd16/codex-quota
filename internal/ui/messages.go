@@ -14,11 +14,15 @@ type DataMsg struct {
 	Account         *config.Account
 	ReloadAccounts  bool
 	ReloadActiveKey string
+	Background      bool
+	FetchedAt       time.Time
 }
 
 type ErrMsg struct {
 	AccountKey string
 	Err        error
+	Background bool
+	FetchedAt  time.Time
 }
 
 type AccountsMsg struct {
@@ -61,4 +65,9 @@ type UpdateAvailableMsg struct {
 
 type AnimationFrameMsg struct {
 	Now time.Time
+}
+
+type AutoRefreshTickMsg struct {
+	Now             time.Time
+	ScheduledAtUnix int64
 }

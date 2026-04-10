@@ -169,14 +169,18 @@ func runInteractive(stdout, stderr io.Writer) error {
 		}
 	}
 
+	uiModel := ui.InitialModelWithStartupUpdate(
+		loadResult.Accounts,
+		loadResult.SourcesByAccountID,
+		loadResult.ActiveSourcesByIdentity,
+		uiState,
+		startupUpdate,
+	)
+	uiModel.Settings = settings
+	uiModel.SettingsDraft = settings
+
 	program := tea.NewProgram(
-		ui.InitialModelWithStartupUpdate(
-			loadResult.Accounts,
-			loadResult.SourcesByAccountID,
-			loadResult.ActiveSourcesByIdentity,
-			uiState,
-			startupUpdate,
-		),
+		uiModel,
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)

@@ -84,7 +84,11 @@ func (m *Model) syncActiveAccount() {
 		if data, ok := m.UsageData[acc.Key]; ok {
 			m.Data = data
 			m.Loading = false
-			m.Err = m.ErrorsMap[acc.Key]
+			if err := m.ErrorsMap[acc.Key]; err != nil && !m.BackgroundErrorMap[acc.Key] {
+				m.Err = err
+			} else {
+				m.Err = nil
+			}
 			if !m.CompactMode {
 				m.startTabWindowAnimationsFromZero(acc.Key, data, tabSwitchAnimationDuration)
 			}

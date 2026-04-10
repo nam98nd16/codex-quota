@@ -221,7 +221,7 @@ func DeleteAccountSourcesCmd(account *config.Account, sources []config.Source, a
 	}
 }
 
-func FetchDataCmd(account *config.Account) tea.Cmd {
+func FetchDataCmd(account *config.Account, background bool) tea.Cmd {
 	accountSnapshot := cloneAccount(account)
 	if accountSnapshot == nil {
 		return nil
@@ -230,25 +230,26 @@ func FetchDataCmd(account *config.Account) tea.Cmd {
 	accountKey := accountSnapshot.Key
 
 	return func() tea.Msg {
+		fetchedAt := time.Now()
 		workingAccount := *accountSnapshot
 		reloadAccounts := false
 
 		if auth.IsExpired(&workingAccount) {
 			if err := auth.RefreshToken(&workingAccount); err != nil {
-				return ErrMsg{AccountKey: accountKey, Err: fmt.Errorf("token refresh failed: %w", err)}
+				return ErrMsg{AccountKey: accountKey, Err: fmt.Errorf("token refresh failed: %w", err), Background: background, FetchedAt: fetchedAt}
 			}
 		}
 
 		data, err := api.CallAPI(workingAccount.AccessToken, workingAccount.AccountID)
 		if err != nil && api.IsUnauthorized(err) && workingAccount.RefreshToken != "" {
 			if refreshErr := auth.RefreshToken(&workingAccount); refreshErr != nil {
-				return ErrMsg{AccountKey: accountKey, Err: fmt.Errorf("token refresh failed: %w", refreshErr)}
+				return ErrMsg{AccountKey: accountKey, Err: fmt.Errorf("token refresh failed: %w", refreshErr), Background: background, FetchedAt: fetchedAt}
 			}
 			data, err = api.CallAPI(workingAccount.AccessToken, workingAccount.AccountID)
 		}
 
 		if err != nil {
-			return ErrMsg{AccountKey: accountKey, Err: err}
+			return ErrMsg{AccountKey: accountKey, Err: err, Background: background, FetchedAt: fetchedAt}
 		}
 
 		if strings.TrimSpace(workingAccount.Email) == "" {
@@ -274,6 +275,8 @@ func FetchDataCmd(account *config.Account) tea.Cmd {
 			Account:         &workingAccount,
 			ReloadAccounts:  reloadAccounts,
 			ReloadActiveKey: reloadActiveKey,
+			Background:      background,
+			FetchedAt:       fetchedAt,
 		}
 	}
 }
@@ -312,6 +315,13 @@ func SaveUIStateCmd(compact bool) tea.Cmd {
 func SaveUIStateSnapshotCmd(state config.UIState) tea.Cmd {
 	return func() tea.Msg {
 		_ = config.SaveUIState(state)
+		return nil
+	}
+}
+
+func SaveSettingsCmd(settings config.Settings) tea.Cmd {
+	return func() tea.Msg {
+		_ = config.SaveSettings(settings)
 		return nil
 	}
 }
@@ -387,13 +397,24 @@ func (m *Model) fetchNextCmd() tea.Cmd {
 	if m.LoadingMap == nil {
 		m.LoadingMap = make(map[string]bool)
 	}
+	if m.BackgroundLoadingMap == nil {
+		m.BackgroundLoadingMap = make(map[string]bool)
+	}
 	if m.ErrorsMap == nil {
 		m.ErrorsMap = make(map[string]error)
+	}
+	if m.AutoRefreshPending == nil {
+		m.AutoRefreshPending = make(map[string]bool)
 	}
 
 	const maxConcurrentLoads = 3
 	currentlyLoading := 0
 	for _, isLoading := range m.LoadingMap {
+		if isLoading {
+			currentlyLoading++
+		}
+	}
+	for _, isLoading := range m.BackgroundLoadingMap {
 		if isLoading {
 			currentlyLoading++
 		}
@@ -407,15 +428,20 @@ func (m *Model) fetchNextCmd() tea.Cmd {
 		if acc == nil || acc.Key == "" {
 			return nil
 		}
-		if m.LoadingMap[acc.Key] {
+		if m.LoadingMap[acc.Key] || m.BackgroundLoadingMap[acc.Key] {
 			return nil
+		}
+		if m.AutoRefreshPending[acc.Key] {
+			m.BackgroundLoadingMap[acc.Key] = true
+			delete(m.AutoRefreshPending, acc.Key)
+			return FetchDataCmd(acc, true)
 		}
 		_, hasData := m.UsageData[acc.Key]
 		_, hasErr := m.ErrorsMap[acc.Key]
 
 		if !hasData && !hasErr {
 			m.LoadingMap[acc.Key] = true
-			return FetchDataCmd(acc)
+			return FetchDataCmd(acc, false)
 		}
 		return nil
 	}

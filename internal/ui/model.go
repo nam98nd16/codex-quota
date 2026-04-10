@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
@@ -26,6 +27,10 @@ type Model struct {
 	ApplyTargets            map[config.Source]bool
 	ApplyTargetCursor       int
 	ApplyConfirm            bool
+	Settings                config.Settings
+	SettingsVisible         bool
+	SettingsDraft           config.Settings
+	SettingsCursor          int
 	HelpVisible             bool
 	ActionMenuVisible       bool
 	ActionMenuCursor        int
@@ -43,8 +48,12 @@ type Model struct {
 	UsageData               map[string]api.UsageData
 	PlanTypeByAccount       map[string]string
 	LoadingMap              map[string]bool
+	BackgroundLoadingMap    map[string]bool
 	ErrorsMap               map[string]error
+	BackgroundErrorMap      map[string]bool
 	ExhaustedSticky         map[string]bool
+	LastQuotaFetchAt        map[string]time.Time
+	AutoRefreshPending      map[string]bool
 	Accounts                []*config.Account
 	SourcesByAccountID      map[string][]string
 	ActiveSourcesByIdentity map[string][]string
@@ -59,6 +68,7 @@ type Model struct {
 	UpdateAvailableHint     string
 	pendingUpdateMethod     update.Method
 	hasPendingUpdateMethod  bool
+	autoRefreshScheduledAt  int64
 }
 
 type StartupUpdatePrompt struct {
@@ -109,6 +119,8 @@ func InitialModelWithStartupUpdate(
 	m := Model{
 		defaultProgress:         defaultProgress,
 		shortProgress:           shortProgress,
+		Settings:                config.DefaultSettings(),
+		SettingsDraft:           config.DefaultSettings(),
 		Loading:                 len(accounts) > 0,
 		Accounts:                nil,
 		SourcesByAccountID:      sourcesByAccountID,
@@ -118,8 +130,12 @@ func InitialModelWithStartupUpdate(
 		UsageData:               make(map[string]api.UsageData),
 		PlanTypeByAccount:       make(map[string]string),
 		LoadingMap:              make(map[string]bool),
+		BackgroundLoadingMap:    make(map[string]bool),
 		ErrorsMap:               make(map[string]error),
+		BackgroundErrorMap:      make(map[string]bool),
 		ExhaustedSticky:         make(map[string]bool),
+		LastQuotaFetchAt:        make(map[string]time.Time),
+		AutoRefreshPending:      make(map[string]bool),
 		compactBarAnimations:    make(map[string]compactBarAnimation),
 		tabWindowAnimations:     make(map[string]tabWindowAnimation),
 		UpdatePromptCursor:      0,
@@ -153,10 +169,11 @@ func InitialModelWithStartupUpdate(
 
 func (m Model) Init() tea.Cmd {
 	titleCmd := tea.SetWindowTitle("🚀 Codex Quota")
+	cmds := []tea.Cmd{titleCmd}
 	if account := m.activeAccount(); account != nil {
-		return tea.Batch(titleCmd, FetchDataCmd(account), m.fetchNextCmd())
+		cmds = append(cmds, FetchDataCmd(account, false), m.fetchNextCmd(), m.nextAutoRefreshCmd(time.Now()))
 	}
-	return titleCmd
+	return tea.Batch(cmds...)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -177,6 +194,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.HelpVisible {
 			return m.handleHelpOverlay(keyStr)
+		}
+		if m.SettingsVisible {
+			return m.handleSettingsOverlay(keyStr)
 		}
 		if m.AddAccountLoginVisible {
 			return m.handleAddAccountLogin(keyStr)
@@ -310,9 +330,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pruneCompactBarAnimations()
 		m.pruneKnownPlanTypes()
 		stickyPruned := m.pruneExhaustedSticky()
+		m.pruneAutoRefreshState()
 		m.clearTabWindowAnimations()
 		m.resetDeleteState()
 		m.resetApplyState()
+		m.resetSettingsState()
 
 		if len(m.Accounts) == 0 {
 			m.Loading = false
@@ -337,10 +359,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var fetchCmd tea.Cmd
 		if m.activeAccount() != nil {
 			m.LoadingMap[m.activeAccountKey()] = true
-			fetchCmd = FetchDataCmd(m.activeAccount())
+			fetchCmd = FetchDataCmd(m.activeAccount(), false)
 		}
 
-		cmds := []tea.Cmd{fetchCmd, m.fetchNextCmd()}
+		cmds := []tea.Cmd{fetchCmd, m.fetchNextCmd(), m.nextAutoRefreshCmd(time.Now())}
 		if stickyPruned {
 			cmds = append(cmds, SaveUIStateSnapshotCmd(m.uiStateSnapshot()))
 		}
@@ -357,7 +379,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.UsageData == nil {
 			m.UsageData = make(map[string]api.UsageData)
 			m.LoadingMap = make(map[string]bool)
+			m.BackgroundLoadingMap = make(map[string]bool)
 			m.ErrorsMap = make(map[string]error)
+			m.BackgroundErrorMap = make(map[string]bool)
+			m.LastQuotaFetchAt = make(map[string]time.Time)
+			m.AutoRefreshPending = make(map[string]bool)
 		}
 		if m.ExhaustedSticky == nil {
 			m.ExhaustedSticky = make(map[string]bool)
@@ -370,12 +396,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 		stickyChanged := false
 		if msg.AccountKey != "" {
+			fetchedAt := msg.FetchedAt
+			if fetchedAt.IsZero() {
+				fetchedAt = time.Now()
+			}
 			prevData, hadPrevData = m.UsageData[msg.AccountKey]
 			wasLoading = m.LoadingMap[msg.AccountKey]
 			m.UsageData[msg.AccountKey] = msg.Data
 			m.setKnownPlanType(msg.AccountKey, msg.Data.PlanType)
 			stickyChanged = m.setExhaustedStickyIfConfirmed(msg.AccountKey, msg.Data) || stickyChanged
 			m.LoadingMap[msg.AccountKey] = false
+			m.BackgroundLoadingMap[msg.AccountKey] = false
+			delete(m.BackgroundErrorMap, msg.AccountKey)
+			m.recordQuotaFetch(msg.AccountKey, fetchedAt)
 			delete(m.ErrorsMap, msg.AccountKey)
 			if m.CompactMode {
 				m.startCompactBarAnimation(msg.AccountKey, prevData, hadPrevData, msg.Data, wasLoading)
@@ -386,7 +419,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.startTabWindowAnimations(msg.AccountKey, prevData, hadPrevData, msg.Data, wasLoading, tabLoadAnimationDuration)
 			}
 		}
-		cmds := []tea.Cmd{m.fetchNextCmd(), m.ensureAnimationTickCmd()}
+		cmds := []tea.Cmd{m.fetchNextCmd(), m.ensureAnimationTickCmd(), m.nextAutoRefreshCmd(time.Now())}
 		if stickyChanged {
 			cmds = append(cmds, SaveUIStateSnapshotCmd(m.uiStateSnapshot()))
 		}
@@ -483,17 +516,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.ErrorsMap == nil {
 			m.ErrorsMap = make(map[string]error)
 			m.LoadingMap = make(map[string]bool)
+			m.BackgroundLoadingMap = make(map[string]bool)
+			m.BackgroundErrorMap = make(map[string]bool)
+			m.LastQuotaFetchAt = make(map[string]time.Time)
+			m.AutoRefreshPending = make(map[string]bool)
 		}
 		if msg.AccountKey != "" {
+			fetchedAt := msg.FetchedAt
+			if fetchedAt.IsZero() {
+				fetchedAt = time.Now()
+			}
 			m.ErrorsMap[msg.AccountKey] = msg.Err
 			m.LoadingMap[msg.AccountKey] = false
+			m.BackgroundLoadingMap[msg.AccountKey] = false
+			m.recordQuotaFetch(msg.AccountKey, fetchedAt)
+			if msg.Background {
+				m.BackgroundErrorMap[msg.AccountKey] = true
+			} else {
+				delete(m.BackgroundErrorMap, msg.AccountKey)
+			}
 			delete(m.compactBarAnimations, msg.AccountKey)
 			if msg.AccountKey == m.activeAccountKey() {
 				m.clearTabWindowAnimations()
 			}
 		}
-		nextCmd := tea.Batch(m.fetchNextCmd(), m.ensureAnimationTickCmd())
+		nextCmd := tea.Batch(m.fetchNextCmd(), m.ensureAnimationTickCmd(), m.nextAutoRefreshCmd(time.Now()))
 		if msg.AccountKey != "" && msg.AccountKey != m.activeAccountKey() {
+			return m, nextCmd
+		}
+		if msg.Background {
 			return m, nextCmd
 		}
 		m.Loading = false
@@ -522,6 +573,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.UpdateAvailableHint = "Update available • press u"
 		}
 		return m, nil
+
+	case AutoRefreshTickMsg:
+		if msg.ScheduledAtUnix != m.autoRefreshScheduledAt {
+			return m, nil
+		}
+		m.enqueueDueAutoRefreshes(msg.Now)
+		return m, tea.Batch(m.fetchNextCmd(), m.nextAutoRefreshCmd(msg.Now))
 
 	case progress.FrameMsg:
 		defaultModel, defaultCmd := m.defaultProgress.Update(msg)

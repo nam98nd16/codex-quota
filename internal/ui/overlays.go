@@ -18,6 +18,10 @@ func (m Model) currentOverlayModal() string {
 		return m.renderHelpModal()
 	}
 
+	if m.SettingsVisible {
+		return m.renderSettingsModal()
+	}
+
 	if m.AddAccountLoginVisible {
 		return m.renderAddAccountLoginModal()
 	}

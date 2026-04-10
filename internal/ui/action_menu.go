@@ -17,6 +17,7 @@ const (
 	actionMenuView       = "view"
 	actionMenuDelete     = "delete"
 	actionMenuUpdate     = "update"
+	actionMenuSettings   = "settings"
 )
 
 type actionMenuItem struct {
@@ -47,6 +48,7 @@ func (m Model) actionMenuSections() []actionMenuSection {
 				{ID: actionMenuRefreshAll, Label: "Refresh all", Shortcut: "R"},
 				{ID: actionMenuAdd, Label: "Add account", Shortcut: "n"},
 				{ID: actionMenuView, Label: "Switch view", Shortcut: "v"},
+				{ID: actionMenuSettings, Label: "Settings", Shortcut: "-"},
 			},
 		},
 	}
