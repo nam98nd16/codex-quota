@@ -12,9 +12,9 @@ import (
 
 var autoRefreshLocation = time.FixedZone("GMT+7", 7*60*60)
 
-func (m Model) autoRefreshInterval(now time.Time) (time.Duration, bool) {
+func (m Model) autoRefreshPeriod(now time.Time) (time.Duration, bool, bool) {
 	if !m.Settings.AutoRefreshEnabled {
-		return 0, false
+		return 0, false, false
 	}
 
 	localNow := now.In(autoRefreshLocation)
@@ -43,9 +43,14 @@ func (m Model) autoRefreshInterval(now time.Time) (time.Duration, bool) {
 		minutes = m.Settings.AutoRefreshPeakMinutes
 	}
 	if minutes <= 0 {
-		return 0, false
+		return 0, false, inPeak
 	}
-	return time.Duration(minutes) * time.Minute, true
+	return time.Duration(minutes) * time.Minute, true, inPeak
+}
+
+func (m Model) autoRefreshInterval(now time.Time) (time.Duration, bool) {
+	interval, ok, _ := m.autoRefreshPeriod(now)
+	return interval, ok
 }
 
 func (m Model) autoRefreshDueAt(accountKey string, now time.Time) (time.Time, bool) {
@@ -61,11 +66,11 @@ func (m Model) autoRefreshDueAt(accountKey string, now time.Time) (time.Time, bo
 			return time.Time{}, false
 		}
 	}
-	interval, ok := m.autoRefreshInterval(now)
+	interval, ok, _ := m.autoRefreshPeriod(now)
 	if !ok {
 		return time.Time{}, false
 	}
-	if fastInterval, ok := m.smartSwitchInterval(accountKey); ok {
+	if fastInterval, ok := m.smartSwitchInterval(accountKey, now); ok {
 		interval = fastInterval
 	}
 	return lastFetchAt.Add(interval).Add(autoRefreshJitter(accountKey, interval)), true

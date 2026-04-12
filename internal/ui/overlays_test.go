@@ -79,6 +79,9 @@ func TestRenderHelpModalShowsGroupedSections(t *testing.T) {
 	if !strings.Contains(out, "Refresh all accounts") {
 		t.Fatalf("expected refresh all guidance in help modal:\n%s", out)
 	}
+	if !strings.Contains(out, "Open settings") {
+		t.Fatalf("expected settings guidance in help modal:\n%s", out)
+	}
 	if !strings.Contains(out, "Refresh, switch, and apply if exhausted") {
 		t.Fatalf("expected smart switch guidance in help modal:\n%s", out)
 	}

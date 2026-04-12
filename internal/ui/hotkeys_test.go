@@ -113,6 +113,20 @@ func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
 	}
 }
 
+func TestTOpensSettingsOverlay(t *testing.T) {
+	m := testModelForHotkeys(1)
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
+	got := updated.(Model)
+
+	if !got.SettingsVisible {
+		t.Fatalf("expected settings overlay to open")
+	}
+	if got.ActionMenuVisible {
+		t.Fatalf("did not expect action menu to open")
+	}
+}
+
 func TestEscCancelsAddAccountLoginModal(t *testing.T) {
 	m := testModelForHotkeys(1)
 	m.AddAccountLoginVisible = true

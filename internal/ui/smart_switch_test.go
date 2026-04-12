@@ -108,7 +108,7 @@ func TestManualSmartSwitchShowsNoticeWhenNoReplacementExists(t *testing.T) {
 	}
 }
 
-func TestSmartSwitchIntervalUsesFastWatchThreshold(t *testing.T) {
+func TestSmartSwitchIntervalUsesPeakOnlySteppedThresholds(t *testing.T) {
 	m := testModelForHotkeys(1)
 	m.Settings = config.DefaultSettings()
 	m.Settings.AutoSwitchExhausted = true
@@ -116,24 +116,48 @@ func TestSmartSwitchIntervalUsesFastWatchThreshold(t *testing.T) {
 	m.BackgroundLoadingMap = map[string]bool{}
 	m.ErrorsMap = map[string]error{}
 	m.BackgroundErrorMap = map[string]bool{}
-	m.UsageData = map[string]api.UsageData{
-		"managed:1": {
-			Windows: []api.QuotaWindow{
-				{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 70, ResetAt: time.Now().Add(24 * time.Hour)},
-				{Label: "5 hour usage limit", WindowSec: 18000, LeftPercent: 9, ResetAt: time.Now().Add(time.Hour)},
-			},
-		},
+	peakNow := time.Date(2026, 4, 10, 3, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name        string
+		leftPercent float64
+		want        time.Duration
+		ok          bool
+	}{
+		{name: "above threshold", leftPercent: 30, want: 0, ok: false},
+		{name: "warning band", leftPercent: 20, want: 150 * time.Second, ok: true},
+		{name: "medium band", leftPercent: 12, want: time.Minute, ok: true},
+		{name: "fast band", leftPercent: 5, want: 30 * time.Second, ok: true},
+		{name: "urgent band", leftPercent: 1, want: 10 * time.Second, ok: true},
 	}
 
-	interval, ok := m.smartSwitchInterval("managed:1")
-	if !ok || interval != 10*time.Second {
-		t.Fatalf("smartSwitchInterval() = %v, %v, want 10s, true", interval, ok)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m.UsageData = map[string]api.UsageData{
+				"managed:1": {
+					Windows: []api.QuotaWindow{
+						{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 70, ResetAt: time.Now().Add(24 * time.Hour)},
+						{Label: "5 hour usage limit", WindowSec: 18000, LeftPercent: tc.leftPercent, ResetAt: time.Now().Add(time.Hour)},
+					},
+				},
+			}
+
+			interval, ok := m.smartSwitchInterval("managed:1", peakNow)
+			if ok != tc.ok || interval != tc.want {
+				t.Fatalf("smartSwitchInterval() = %v, %v, want %v, %v", interval, ok, tc.want, tc.ok)
+			}
+		})
 	}
 
-	m.UsageData["managed:1"] = usableWeeklyQuota(9)
-	interval, ok = m.smartSwitchInterval("managed:1")
-	if !ok || interval != 10*time.Second {
-		t.Fatalf("smartSwitchInterval() with weekly fallback = %v, %v, want 10s, true", interval, ok)
+	m.UsageData["managed:1"] = usableWeeklyQuota(5)
+	interval, ok := m.smartSwitchInterval("managed:1", peakNow)
+	if !ok || interval != 30*time.Second {
+		t.Fatalf("smartSwitchInterval() with weekly fallback = %v, %v, want 30s, true", interval, ok)
+	}
+
+	offPeakNow := time.Date(2026, 4, 10, 18, 0, 0, 0, time.UTC)
+	interval, ok = m.smartSwitchInterval("managed:1", offPeakNow)
+	if ok || interval != 0 {
+		t.Fatalf("smartSwitchInterval() off-peak = %v, %v, want 0, false", interval, ok)
 	}
 }
 

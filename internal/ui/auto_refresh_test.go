@@ -143,3 +143,64 @@ func TestActionMenuSettingsOpensSettingsOverlay(t *testing.T) {
 		t.Fatalf("expected settings draft to load normalized defaults, got %q-%q", got.SettingsDraft.AutoRefreshPeakStart, got.SettingsDraft.AutoRefreshPeakEnd)
 	}
 }
+
+func TestAutoRefreshDueAtUsesPeakSmartSwitchCadence(t *testing.T) {
+	model := testModelForHotkeys(1)
+	model.Settings = config.DefaultSettings()
+	model.Settings.AutoSwitchExhausted = true
+	model.LoadingMap = map[string]bool{}
+	model.BackgroundLoadingMap = map[string]bool{}
+	model.ErrorsMap = map[string]error{}
+	model.BackgroundErrorMap = map[string]bool{}
+	lastFetchAt := time.Date(2026, 4, 10, 2, 59, 0, 0, time.UTC)
+	now := time.Date(2026, 4, 10, 3, 0, 0, 0, time.UTC)
+	model.LastQuotaFetchAt = map[string]time.Time{"managed:1": lastFetchAt}
+	model.UsageData = map[string]api.UsageData{
+		"managed:1": {
+			Windows: []api.QuotaWindow{
+				{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 70, ResetAt: time.Now().Add(24 * time.Hour)},
+				{Label: "5 hour usage limit", WindowSec: 18000, LeftPercent: 5, ResetAt: time.Now().Add(time.Hour)},
+			},
+		},
+	}
+
+	dueAt, ok := model.autoRefreshDueAt("managed:1", now)
+	if !ok {
+		t.Fatalf("expected auto-refresh due time")
+	}
+	want := lastFetchAt.Add(30 * time.Second).Add(autoRefreshJitter("managed:1", 30*time.Second))
+	if !dueAt.Equal(want) {
+		t.Fatalf("autoRefreshDueAt() = %v, want %v", dueAt, want)
+	}
+}
+
+func TestAutoRefreshDueAtKeepsOffPeakCadenceWhenQuotaIsLow(t *testing.T) {
+	model := testModelForHotkeys(1)
+	model.Settings = config.DefaultSettings()
+	model.Settings.AutoSwitchExhausted = true
+	model.LoadingMap = map[string]bool{}
+	model.BackgroundLoadingMap = map[string]bool{}
+	model.ErrorsMap = map[string]error{}
+	model.BackgroundErrorMap = map[string]bool{}
+	lastFetchAt := time.Date(2026, 4, 10, 17, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 4, 10, 18, 0, 0, 0, time.UTC)
+	model.LastQuotaFetchAt = map[string]time.Time{"managed:1": lastFetchAt}
+	model.UsageData = map[string]api.UsageData{
+		"managed:1": {
+			Windows: []api.QuotaWindow{
+				{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 70, ResetAt: time.Now().Add(24 * time.Hour)},
+				{Label: "5 hour usage limit", WindowSec: 18000, LeftPercent: 1, ResetAt: time.Now().Add(time.Hour)},
+			},
+		},
+	}
+
+	dueAt, ok := model.autoRefreshDueAt("managed:1", now)
+	if !ok {
+		t.Fatalf("expected auto-refresh due time")
+	}
+	wantInterval := 30 * time.Minute
+	want := lastFetchAt.Add(wantInterval).Add(autoRefreshJitter("managed:1", wantInterval))
+	if !dueAt.Equal(want) {
+		t.Fatalf("autoRefreshDueAt() off-peak = %v, want %v", dueAt, want)
+	}
+}

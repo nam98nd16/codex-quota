@@ -12,8 +12,13 @@ import (
 )
 
 const (
-	smartSwitchLowQuotaThresholdPercent = 10.0
-	smartSwitchFastRefreshInterval      = 10 * time.Second
+	smartSwitchWarningThresholdPercent = 25.0
+	smartSwitchMediumThresholdPercent  = 15.0
+	smartSwitchFastThresholdPercent    = 8.0
+	smartSwitchUrgentThresholdPercent  = 3.0
+	smartSwitchFastRefreshInterval     = 10 * time.Second
+	smartSwitchUrgentRefreshInterval   = 30 * time.Second
+	smartSwitchMediumRefreshInterval   = time.Minute
 )
 
 type replacementCandidateRank struct {
@@ -34,7 +39,7 @@ func (m Model) beginSmartSwitchActive() (tea.Model, tea.Cmd) {
 	return m.beginRefreshActive()
 }
 
-func (m Model) smartSwitchInterval(accountKey string) (time.Duration, bool) {
+func (m Model) smartSwitchInterval(accountKey string, now time.Time) (time.Duration, bool) {
 	if !m.Settings.AutoSwitchExhausted {
 		return 0, false
 	}
@@ -44,16 +49,37 @@ func (m Model) smartSwitchInterval(accountKey string) (time.Duration, bool) {
 	if m.LoadingMap[accountKey] || m.BackgroundLoadingMap[accountKey] || m.accountHasBlockingError(accountKey) {
 		return 0, false
 	}
+	baseInterval, ok, inPeak := m.autoRefreshPeriod(now)
+	if !ok || !inPeak {
+		return 0, false
+	}
 
 	data, ok := m.UsageData[accountKey]
 	if !ok {
 		return 0, false
 	}
 	window, ok := watchedAutoSwitchWindow(data)
-	if !ok || window.LeftPercent > smartSwitchLowQuotaThresholdPercent {
+	if !ok || window.LeftPercent > smartSwitchWarningThresholdPercent {
 		return 0, false
 	}
-	return smartSwitchFastRefreshInterval, true
+	return smartSwitchRefreshInterval(baseInterval, window.LeftPercent), true
+}
+
+func smartSwitchRefreshInterval(baseInterval time.Duration, leftPercent float64) time.Duration {
+	if leftPercent <= smartSwitchUrgentThresholdPercent {
+		return smartSwitchFastRefreshInterval
+	}
+	if leftPercent <= smartSwitchFastThresholdPercent {
+		return smartSwitchUrgentRefreshInterval
+	}
+	if leftPercent <= smartSwitchMediumThresholdPercent {
+		return smartSwitchMediumRefreshInterval
+	}
+	halfInterval := baseInterval / 2
+	if halfInterval < smartSwitchMediumRefreshInterval {
+		return smartSwitchMediumRefreshInterval
+	}
+	return halfInterval
 }
 
 func watchedAutoSwitchWindow(data api.UsageData) (api.QuotaWindow, bool) {

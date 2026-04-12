@@ -74,6 +74,7 @@ Additional shortcuts:
 - `s` — refresh active account, then switch and apply another if it is exhausted
 - `i` — toggle additional info
 - `n` — add account (OAuth)
+- `t` — open settings
 - `x` — delete active account
 - `u` — open update prompt when an update is available
 - `Esc` — close modal/info/error/notice (or quit if nothing is open)

@@ -244,6 +244,7 @@ func (m Model) renderHelpModal() string {
 		renderHelpLine("r", "Refresh active account"),
 		renderHelpLine("s", "Refresh, switch, and apply if exhausted"),
 		renderHelpLine("R", "Refresh all accounts"),
+		renderHelpLine("t", "Open settings"),
 		renderHelpLine("?", "Open or close this help"),
 		renderHelpLine("q", "Quit"),
 		"",
