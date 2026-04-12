@@ -80,9 +80,12 @@ func autoRefreshJitter(accountKey string, interval time.Duration) time.Duration 
 	if strings.TrimSpace(accountKey) == "" || interval <= 0 {
 		return 0
 	}
-	maxJitter := interval / 5
-	if maxJitter > 3*time.Minute {
-		maxJitter = 3 * time.Minute
+	maxJitter := interval / 10
+	if interval <= 5*time.Minute {
+		maxJitter = 10 * time.Second
+	}
+	if maxJitter > 30*time.Second {
+		maxJitter = 30 * time.Second
 	}
 	if maxJitter <= 0 {
 		return 0
@@ -215,6 +218,11 @@ func (m *Model) pruneAutoRefreshState() {
 	for key := range m.BackgroundErrorMap {
 		if _, ok := valid[key]; !ok {
 			delete(m.BackgroundErrorMap, key)
+		}
+	}
+	for key := range m.SmartSwitchBurstPending {
+		if _, ok := valid[key]; !ok {
+			delete(m.SmartSwitchBurstPending, key)
 		}
 	}
 }

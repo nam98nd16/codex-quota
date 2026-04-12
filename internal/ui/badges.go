@@ -6,24 +6,20 @@ import (
 	"github.com/deLiseLINO/codex-quota/internal/config"
 )
 
-func (m Model) activeSourceBadgesForAccount(account *config.Account) string {
+func (m Model) activeTargetSourcesForAccount(account *config.Account) map[config.Source]bool {
 	if account == nil || len(m.ActiveSourcesByIdentity) == 0 {
-		return ""
+		return nil
 	}
 
-	hasCodex := false
-	hasOpenCode := false
+	seen := make(map[config.Source]bool, 2)
 	appendLabels := func(labels []string) {
 		for _, label := range labels {
 			source, ok := sourceFromLabel(label)
 			if !ok {
 				continue
 			}
-			if source == config.SourceCodex {
-				hasCodex = true
-			}
-			if source == config.SourceOpenCode {
-				hasOpenCode = true
+			if source == config.SourceCodex || source == config.SourceOpenCode {
+				seen[source] = true
 			}
 		}
 	}
@@ -31,16 +27,23 @@ func (m Model) activeSourceBadgesForAccount(account *config.Account) string {
 	for _, key := range config.ActiveIdentityKeys(account) {
 		appendLabels(m.ActiveSourcesByIdentity[key])
 	}
+	if len(seen) == 0 {
+		return nil
+	}
+	return seen
+}
 
-	if !hasCodex && !hasOpenCode {
+func (m Model) activeSourceBadgesForAccount(account *config.Account) string {
+	sources := m.activeTargetSourcesForAccount(account)
+	if len(sources) == 0 {
 		return ""
 	}
 
 	parts := make([]string, 0, 2)
-	if hasCodex {
+	if sources[config.SourceCodex] {
 		parts = append(parts, "C")
 	}
-	if hasOpenCode {
+	if sources[config.SourceOpenCode] {
 		parts = append(parts, "O")
 	}
 	return strings.Join(parts, "•")

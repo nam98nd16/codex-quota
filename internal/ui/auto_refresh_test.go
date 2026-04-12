@@ -163,6 +163,7 @@ func TestAutoRefreshDueAtUsesPeakSmartSwitchCadence(t *testing.T) {
 			},
 		},
 	}
+	markAppliedSources(&model, map[config.Source]string{config.SourceCodex: "managed:1", config.SourceOpenCode: "managed:1"})
 
 	dueAt, ok := model.autoRefreshDueAt("managed:1", now)
 	if !ok {
@@ -193,6 +194,7 @@ func TestAutoRefreshDueAtKeepsOffPeakCadenceWhenQuotaIsLow(t *testing.T) {
 			},
 		},
 	}
+	markAppliedSources(&model, map[config.Source]string{config.SourceCodex: "managed:1", config.SourceOpenCode: "managed:1"})
 
 	dueAt, ok := model.autoRefreshDueAt("managed:1", now)
 	if !ok {
@@ -202,5 +204,12 @@ func TestAutoRefreshDueAtKeepsOffPeakCadenceWhenQuotaIsLow(t *testing.T) {
 	want := lastFetchAt.Add(wantInterval).Add(autoRefreshJitter("managed:1", wantInterval))
 	if !dueAt.Equal(want) {
 		t.Fatalf("autoRefreshDueAt() off-peak = %v, want %v", dueAt, want)
+	}
+}
+
+func TestAutoRefreshJitterCapsFiveMinuteInterval(t *testing.T) {
+	jitter := autoRefreshJitter("managed:1", 5*time.Minute)
+	if jitter < 0 || jitter > 10*time.Second {
+		t.Fatalf("autoRefreshJitter(5m) = %v, want <= 10s", jitter)
 	}
 }

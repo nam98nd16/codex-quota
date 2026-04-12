@@ -14,62 +14,64 @@ import (
 )
 
 type Model struct {
-	defaultProgress         progress.Model
-	shortProgress           progress.Model
-	Data                    api.UsageData
-	Loading                 bool
-	DeleteSourceSelect      bool
-	DeleteSourceOptions     []config.Source
-	DeleteSources           map[config.Source]bool
-	DeleteSourceCursor      int
-	DeleteConfirm           bool
-	ApplyTargetSelect       bool
-	ApplyTargets            map[config.Source]bool
-	ApplyTargetCursor       int
-	ApplyConfirm            bool
-	Settings                config.Settings
-	SettingsVisible         bool
-	SettingsDraft           config.Settings
-	SettingsCursor          int
-	HelpVisible             bool
-	ActionMenuVisible       bool
-	ActionMenuCursor        int
-	AddAccountLoginVisible  bool
-	AddAccountLoginURL      string
-	AddAccountBrowserFailed bool
-	AddAccountLoginStatus   string
-	ShowInfo                bool
-	Notice                  string
-	noticeSeq               int
-	Err                     error
-	Width                   int
-	Height                  int
-	CompactMode             bool
-	UsageData               map[string]api.UsageData
-	PlanTypeByAccount       map[string]string
-	LoadingMap              map[string]bool
-	BackgroundLoadingMap    map[string]bool
-	ErrorsMap               map[string]error
-	BackgroundErrorMap      map[string]bool
-	ExhaustedSticky         map[string]bool
-	LastQuotaFetchAt        map[string]time.Time
-	AutoRefreshPending      map[string]bool
-	Accounts                []*config.Account
-	SourcesByAccountID      map[string][]string
-	ActiveSourcesByIdentity map[string][]string
-	ActiveAccountIx         int
-	compactBarAnimations    map[string]compactBarAnimation
-	tabWindowAnimations     map[string]tabWindowAnimation
-	animationTicking        bool
-	UpdatePromptVisible     bool
-	UpdatePromptVersion     string
-	UpdatePromptMethod      update.Method
-	UpdatePromptCursor      int
-	UpdateAvailableHint     string
-	pendingUpdateMethod     update.Method
-	hasPendingUpdateMethod  bool
-	autoRefreshScheduledAt  int64
-	PendingSmartSwitchKey   string
+	defaultProgress          progress.Model
+	shortProgress            progress.Model
+	Data                     api.UsageData
+	Loading                  bool
+	DeleteSourceSelect       bool
+	DeleteSourceOptions      []config.Source
+	DeleteSources            map[config.Source]bool
+	DeleteSourceCursor       int
+	DeleteConfirm            bool
+	ApplyTargetSelect        bool
+	ApplyTargets             map[config.Source]bool
+	ApplyTargetCursor        int
+	ApplyConfirm             bool
+	Settings                 config.Settings
+	SettingsVisible          bool
+	SettingsDraft            config.Settings
+	SettingsCursor           int
+	HelpVisible              bool
+	ActionMenuVisible        bool
+	ActionMenuCursor         int
+	AddAccountLoginVisible   bool
+	AddAccountLoginURL       string
+	AddAccountBrowserFailed  bool
+	AddAccountLoginStatus    string
+	ShowInfo                 bool
+	Notice                   string
+	noticeSeq                int
+	Err                      error
+	Width                    int
+	Height                   int
+	CompactMode              bool
+	UsageData                map[string]api.UsageData
+	PlanTypeByAccount        map[string]string
+	LoadingMap               map[string]bool
+	BackgroundLoadingMap     map[string]bool
+	ErrorsMap                map[string]error
+	BackgroundErrorMap       map[string]bool
+	ExhaustedSticky          map[string]bool
+	LastQuotaFetchAt         map[string]time.Time
+	AutoRefreshPending       map[string]bool
+	Accounts                 []*config.Account
+	SourcesByAccountID       map[string][]string
+	ActiveSourcesByIdentity  map[string][]string
+	ActiveAccountIx          int
+	compactBarAnimations     map[string]compactBarAnimation
+	tabWindowAnimations      map[string]tabWindowAnimation
+	animationTicking         bool
+	UpdatePromptVisible      bool
+	UpdatePromptVersion      string
+	UpdatePromptMethod       update.Method
+	UpdatePromptCursor       int
+	UpdateAvailableHint      string
+	pendingUpdateMethod      update.Method
+	hasPendingUpdateMethod   bool
+	autoRefreshScheduledAt   int64
+	PendingSmartSwitchKeys   map[string]bool
+	PendingSmartSwitchManual bool
+	SmartSwitchBurstPending  map[string]bool
 }
 
 type StartupUpdatePrompt struct {
@@ -137,6 +139,8 @@ func InitialModelWithStartupUpdate(
 		ExhaustedSticky:         make(map[string]bool),
 		LastQuotaFetchAt:        make(map[string]time.Time),
 		AutoRefreshPending:      make(map[string]bool),
+		PendingSmartSwitchKeys:  make(map[string]bool),
+		SmartSwitchBurstPending: make(map[string]bool),
 		compactBarAnimations:    make(map[string]compactBarAnimation),
 		tabWindowAnimations:     make(map[string]tabWindowAnimation),
 		UpdatePromptCursor:      0,
@@ -341,7 +345,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resetDeleteState()
 		m.resetApplyState()
 		m.resetSettingsState()
-		m.PendingSmartSwitchKey = ""
+		m.resetSmartSwitchState()
 
 		if len(m.Accounts) == 0 {
 			m.Loading = false
@@ -533,8 +537,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.AutoRefreshPending = make(map[string]bool)
 		}
 		if msg.AccountKey != "" {
-			if msg.AccountKey == m.PendingSmartSwitchKey {
-				m.PendingSmartSwitchKey = ""
+			m.finishPendingSmartSwitchKey(msg.AccountKey)
+			if !m.PendingSmartSwitchManual {
+				for key := range m.SmartSwitchBurstPending {
+					delete(m.SmartSwitchBurstPending, key)
+				}
 			}
 			fetchedAt := msg.FetchedAt
 			if fetchedAt.IsZero() {

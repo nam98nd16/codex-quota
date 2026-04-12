@@ -2,6 +2,7 @@ package ui
 
 import (
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -31,19 +32,37 @@ type replacementCandidateRank struct {
 	index        int
 }
 
+type rankedReplacementCandidate struct {
+	account *config.Account
+	rank    replacementCandidateRank
+}
+
 func (m Model) beginSmartSwitchActive() (tea.Model, tea.Cmd) {
-	if m.activeAccount() == nil {
-		return m, nil
+	watchKeys := m.currentAppliedAccountKeys()
+	if len(watchKeys) == 0 {
+		m.Notice = "no applied account found for smart switch"
+		m.noticeSeq++
+		return m, scheduleNoticeClearCmd(m.noticeSeq)
 	}
-	m.PendingSmartSwitchKey = m.activeAccountKey()
-	return m.beginRefreshActive()
+	m.Loading = false
+	m.Err = nil
+	m.resetHelpState()
+	m.resetActionMenuState()
+	m.resetSettingsState()
+	m.resetDeleteState()
+	m.resetApplyState()
+	m.Notice = ""
+	m.resetSmartSwitchState()
+	m.setPendingSmartSwitchKeys(watchKeys, true)
+	m.queueSmartSwitchBurst(watchKeys, nil, 3)
+	return m, m.fetchNextCmd()
 }
 
 func (m Model) smartSwitchInterval(accountKey string, now time.Time) (time.Duration, bool) {
 	if !m.Settings.AutoSwitchExhausted {
 		return 0, false
 	}
-	if strings.TrimSpace(accountKey) == "" || accountKey != m.activeAccountKey() {
+	if strings.TrimSpace(accountKey) == "" || !m.isCurrentAppliedAccountKey(accountKey) {
 		return 0, false
 	}
 	if m.LoadingMap[accountKey] || m.BackgroundLoadingMap[accountKey] || m.accountHasBlockingError(accountKey) {
@@ -103,29 +122,45 @@ func quotaWindowByDuration(data api.UsageData, windowSec int64) (api.QuotaWindow
 }
 
 func (m Model) bestReplacementAccount(excludeKey string) *config.Account {
-	var (
-		best     *config.Account
-		bestRank replacementCandidateRank
-		haveBest bool
-	)
-
-	for index, account := range m.Accounts {
-		if account == nil || strings.TrimSpace(account.Key) == "" || account.Key == excludeKey {
-			continue
-		}
-		if m.isCompactAccountExhausted(account.Key) {
-			continue
-		}
-
-		rank := m.replacementRank(account, index)
-		if !haveBest || rank.betterThan(bestRank) {
-			best = account
-			bestRank = rank
-			haveBest = true
-		}
+	excluded := map[string]bool{}
+	if strings.TrimSpace(excludeKey) != "" {
+		excluded[excludeKey] = true
 	}
+	best := m.bestReplacementAccounts(excluded, 1)
+	if len(best) == 0 {
+		return nil
+	}
+	return best[0]
+}
 
-	return best
+func (m Model) bestReplacementAccounts(excluded map[string]bool, limit int) []*config.Account {
+	if limit <= 0 {
+		return nil
+	}
+	ranked := make([]rankedReplacementCandidate, 0, len(m.Accounts))
+	for index, account := range m.Accounts {
+		if account == nil || strings.TrimSpace(account.Key) == "" {
+			continue
+		}
+		if excluded[account.Key] || m.isCompactAccountExhausted(account.Key) {
+			continue
+		}
+		ranked = append(ranked, rankedReplacementCandidate{
+			account: account,
+			rank:    m.replacementRank(account, index),
+		})
+	}
+	sort.SliceStable(ranked, func(i, j int) bool {
+		return ranked[i].rank.betterThan(ranked[j].rank)
+	})
+	if len(ranked) > limit {
+		ranked = ranked[:limit]
+	}
+	accounts := make([]*config.Account, 0, len(ranked))
+	for _, candidate := range ranked {
+		accounts = append(accounts, candidate.account)
+	}
+	return accounts
 }
 
 func (m Model) replacementRank(account *config.Account, index int) replacementCandidateRank {
@@ -193,26 +228,46 @@ func (m *Model) maybeAutoSwitchAfterRefresh(accountKey string) tea.Cmd {
 		return nil
 	}
 
-	manualCheck := accountKey == m.PendingSmartSwitchKey
-	shouldCheck := manualCheck || (m.Settings.AutoSwitchExhausted && accountKey == m.activeAccountKey())
+	manualCheck := m.PendingSmartSwitchManual && m.isPendingSmartSwitchKey(accountKey)
+	shouldCheck := manualCheck || (m.Settings.AutoSwitchExhausted && m.isCurrentAppliedAccountKey(accountKey))
 	if !shouldCheck {
 		return nil
 	}
-	m.PendingSmartSwitchKey = ""
+	if manualCheck {
+		m.finishPendingSmartSwitchKey(accountKey)
+	}
 
 	if !m.isCompactAccountExhausted(accountKey) {
+		if manualCheck && !m.PendingSmartSwitchManual {
+			for key := range m.SmartSwitchBurstPending {
+				delete(m.SmartSwitchBurstPending, key)
+			}
+		}
+		if !manualCheck {
+			m.maybeQueueAutoSmartSwitchBurst(accountKey, time.Now())
+		}
 		return nil
 	}
 
-	replacement := m.bestReplacementAccount(accountKey)
+	excluded := m.currentAppliedAccountKeySet()
+	if excluded == nil {
+		excluded = map[string]bool{accountKey: true}
+	}
+	replacements := m.bestReplacementAccounts(excluded, 1)
+	var replacement *config.Account
+	if len(replacements) > 0 {
+		replacement = replacements[0]
+	}
 	if replacement == nil {
 		if !manualCheck {
 			return nil
 		}
-		m.Notice = "active account is exhausted; no replacement account available"
+		m.resetSmartSwitchState()
+		m.Notice = "applied account is exhausted; no replacement account available"
 		m.noticeSeq++
 		return scheduleNoticeClearCmd(m.noticeSeq)
 	}
+	m.resetSmartSwitchState()
 
 	if !m.selectActiveAccountByKey(replacement.Key) {
 		return nil

@@ -406,6 +406,9 @@ func (m *Model) fetchNextCmd() tea.Cmd {
 	if m.AutoRefreshPending == nil {
 		m.AutoRefreshPending = make(map[string]bool)
 	}
+	if m.SmartSwitchBurstPending == nil {
+		m.SmartSwitchBurstPending = make(map[string]bool)
+	}
 
 	const maxConcurrentLoads = 3
 	currentlyLoading := 0
@@ -431,6 +434,12 @@ func (m *Model) fetchNextCmd() tea.Cmd {
 		if m.LoadingMap[acc.Key] || m.BackgroundLoadingMap[acc.Key] {
 			return nil
 		}
+		if m.SmartSwitchBurstPending[acc.Key] {
+			m.BackgroundLoadingMap[acc.Key] = true
+			delete(m.SmartSwitchBurstPending, acc.Key)
+			delete(m.AutoRefreshPending, acc.Key)
+			return FetchDataCmd(acc, true)
+		}
 		if m.AutoRefreshPending[acc.Key] {
 			m.BackgroundLoadingMap[acc.Key] = true
 			delete(m.AutoRefreshPending, acc.Key)
@@ -447,6 +456,15 @@ func (m *Model) fetchNextCmd() tea.Cmd {
 	}
 
 	cmds := make([]tea.Cmd, 0, availableSlots)
+	for _, acc := range m.priorityFetchAccounts() {
+		if cmd := checkAccount(acc); cmd != nil {
+			cmds = append(cmds, cmd)
+			availableSlots--
+			if availableSlots == 0 {
+				return tea.Batch(cmds...)
+			}
+		}
+	}
 	orderedAccounts := m.Accounts
 	if m.CompactMode {
 		orderedAccounts = make([]*config.Account, 0, len(m.Accounts))
