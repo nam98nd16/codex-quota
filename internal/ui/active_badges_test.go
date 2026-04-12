@@ -86,6 +86,58 @@ func TestRenderCompactView_ShowsActiveBadges(t *testing.T) {
 	}
 }
 
+func TestRenderAccountTabs_ShowsRefreshIndicatorForBackgroundLoad(t *testing.T) {
+	account := &config.Account{
+		Key:       "acc-1",
+		Label:     "user@example.com",
+		Email:     "user@example.com",
+		AccountID: "acc-1",
+		Source:    config.SourceManaged,
+		Writable:  true,
+	}
+
+	m := InitialModel([]*config.Account{account}, map[string][]string{}, map[string][]string{}, false)
+	m.BackgroundLoadingMap = map[string]bool{"acc-1": true}
+
+	out := ansi.Strip(m.renderAccountTabs())
+	if !strings.Contains(out, "↻") {
+		t.Fatalf("expected refresh indicator in tabs output, got: %s", out)
+	}
+}
+
+func TestRenderCompactView_ShowsRefreshIndicatorForBackgroundLoad(t *testing.T) {
+	account := &config.Account{
+		Key:       "acc-1",
+		Label:     "user@example.com",
+		Email:     "user@example.com",
+		AccountID: "acc-1",
+		Source:    config.SourceManaged,
+		Writable:  true,
+	}
+
+	m := InitialModel([]*config.Account{account}, map[string][]string{}, map[string][]string{}, true)
+	m.Loading = false
+	m.Width = 120
+	m.BackgroundLoadingMap = map[string]bool{"acc-1": true}
+	m.UsageData = map[string]api.UsageData{
+		"acc-1": {
+			Windows: []api.QuotaWindow{{
+				Label:       "Weekly usage limit",
+				WindowSec:   604800,
+				LeftPercent: 10,
+				ResetAt:     time.Now().Add(time.Hour),
+			}},
+		},
+	}
+	m.LoadingMap = map[string]bool{}
+	m.ErrorsMap = map[string]error{}
+
+	out := ansi.Strip(m.renderCompactView())
+	if !strings.Contains(out, "↻") {
+		t.Fatalf("expected refresh indicator in compact output, got: %s", out)
+	}
+}
+
 func TestActiveSourceBadgesForAccount_MatchesByTokenFallback(t *testing.T) {
 	account := &config.Account{
 		Key:         "acc-2",

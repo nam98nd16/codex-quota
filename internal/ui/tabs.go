@@ -72,15 +72,18 @@ func (m Model) renderTabsRange(accounts []*config.Account, start, end, activeInd
 		label := m.displayAccountLabel(account)
 		subscribed := m.hasSubscription(account)
 		badgesRaw := m.activeSourceBadgesForAccount(account)
+		refreshIndicator := m.renderAccountRefreshIndicator(account, i == activeIndex)
+		limit := labelLimit
 		if badgesRaw != "" {
-			limit := labelLimit - (m.activeSourceBadgesDisplayWidth(account) + 1)
-			if limit < 4 {
-				limit = 4
-			}
-			label = truncateLabel(label, limit)
-		} else {
-			label = truncateLabel(label, labelLimit)
+			limit -= m.activeSourceBadgesDisplayWidth(account) + 1
 		}
+		if refreshIndicator != "" {
+			limit -= m.accountRefreshIndicatorDisplayWidth(account) + 1
+		}
+		if limit < 4 {
+			limit = 4
+		}
+		label = truncateLabel(label, limit)
 		labelText := TabInactiveStyle.Render(label)
 		switch {
 		case subscribed && i == activeIndex:
@@ -91,9 +94,15 @@ func (m Model) renderTabsRange(accounts []*config.Account, start, end, activeInd
 			labelText = TabActiveStyle.Render(label)
 		}
 
+		prefixParts := make([]string, 0, 2)
 		if badgesRaw != "" {
-			badges := m.renderActiveSourceBadges(account, i == activeIndex)
-			tabs = append(tabs, badges+" "+labelText)
+			prefixParts = append(prefixParts, m.renderActiveSourceBadges(account, i == activeIndex))
+		}
+		if refreshIndicator != "" {
+			prefixParts = append(prefixParts, refreshIndicator)
+		}
+		if len(prefixParts) > 0 {
+			tabs = append(tabs, strings.Join(prefixParts, " ")+" "+labelText)
 			continue
 		}
 		tabs = append(tabs, labelText)

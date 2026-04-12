@@ -85,9 +85,10 @@ func TestAutoRefreshDueAccountsUseBackgroundLoading(t *testing.T) {
 	model.UsageData = map[string]api.UsageData{
 		"managed:1": {Windows: []api.QuotaWindow{{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 40, ResetAt: time.Now().Add(time.Hour)}}},
 	}
-	model.LastQuotaFetchAt = map[string]time.Time{"managed:1": time.Now().Add(-10 * time.Minute)}
+	now := time.Date(2026, 4, 10, 3, 0, 0, 0, time.UTC)
+	model.LastQuotaFetchAt = map[string]time.Time{"managed:1": now.Add(-10 * time.Minute)}
 
-	if !model.enqueueDueAutoRefreshes(time.Now()) {
+	if !model.enqueueDueAutoRefreshes(now) {
 		t.Fatalf("expected due account to be enqueued for background refresh")
 	}
 	cmd := model.fetchNextCmd()

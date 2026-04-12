@@ -94,3 +94,21 @@ func (m Model) activeSourceBadgesDisplayWidth(account *config.Account) int {
 	}
 	return len([]rune(raw)) + 2
 }
+
+func (m Model) renderAccountRefreshIndicator(account *config.Account, isRowActive bool) string {
+	if account == nil || !m.BackgroundLoadingMap[account.Key] {
+		return ""
+	}
+	style := RefreshIndicatorMutedStyle
+	if isRowActive {
+		style = RefreshIndicatorActiveStyle
+	}
+	return style.Render("↻")
+}
+
+func (m Model) accountRefreshIndicatorDisplayWidth(account *config.Account) int {
+	if account == nil || !m.BackgroundLoadingMap[account.Key] {
+		return 0
+	}
+	return 1
+}

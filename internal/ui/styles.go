@@ -103,6 +103,11 @@ var (
 					Foreground(lipgloss.Color("31"))
 	SourceBadgeSeparatorStyle = lipgloss.NewStyle().
 					Foreground(lipgloss.Color("240"))
+	RefreshIndicatorActiveStyle = lipgloss.NewStyle().
+					Bold(true).
+					Foreground(lipgloss.Color("39"))
+	RefreshIndicatorMutedStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("244"))
 
 	SubscribedLabelActiveStyle = lipgloss.NewStyle().
 					Bold(true).

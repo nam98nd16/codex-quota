@@ -81,12 +81,17 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 	name := m.displayAccountLabel(acc)
 	subscribed := m.hasSubscription(acc)
 	badgeWidth := m.activeSourceBadgesDisplayWidth(acc)
+	refreshIndicator := m.renderAccountRefreshIndicator(acc, isActive)
+	refreshWidth := m.accountRefreshIndicatorDisplayWidth(acc)
 	nameWidth := accountWidth
 	if badgeWidth > 0 {
 		nameWidth = accountWidth - badgeWidth - 1
-		if nameWidth < 4 {
-			nameWidth = 4
-		}
+	}
+	if refreshWidth > 0 {
+		nameWidth -= refreshWidth + 1
+	}
+	if nameWidth < 4 {
+		nameWidth = 4
 	}
 	name = truncateLabel(name, nameWidth-1)
 	alignedName := fmt.Sprintf("%-*s", nameWidth, name)
@@ -94,11 +99,18 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 	if badgeWidth > 0 {
 		leftWidth += badgeWidth + 1
 	}
+	if refreshWidth > 0 {
+		leftWidth += refreshWidth + 1
+	}
 	barWidth, percentWidth, resetWidth := m.compactRowLayout(leftWidth)
 
 	s.WriteString(prefix)
 	if badgeWidth > 0 {
 		s.WriteString(m.renderActiveSourceBadges(acc, isActive))
+		s.WriteString(" ")
+	}
+	if refreshWidth > 0 {
+		s.WriteString(refreshIndicator)
 		s.WriteString(" ")
 	}
 	if subscribed && isActive {
