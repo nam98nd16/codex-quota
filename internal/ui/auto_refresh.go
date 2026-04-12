@@ -65,6 +65,9 @@ func (m Model) autoRefreshDueAt(accountKey string, now time.Time) (time.Time, bo
 	if !ok {
 		return time.Time{}, false
 	}
+	if fastInterval, ok := m.smartSwitchInterval(accountKey); ok {
+		interval = fastInterval
+	}
 	return lastFetchAt.Add(interval).Add(autoRefreshJitter(accountKey, interval)), true
 }
 

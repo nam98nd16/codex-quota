@@ -11,6 +11,7 @@ import (
 type Settings struct {
 	CheckForUpdateOnStartup   bool   `json:"check_for_update_on_startup"`
 	AutoRefreshEnabled        bool   `json:"auto_refresh_enabled"`
+	AutoSwitchExhausted       bool   `json:"auto_switch_exhausted"`
 	AutoRefreshPeakStart      string `json:"auto_refresh_peak_start"`
 	AutoRefreshPeakEnd        string `json:"auto_refresh_peak_end"`
 	AutoRefreshPeakMinutes    int    `json:"auto_refresh_peak_minutes"`
@@ -21,6 +22,7 @@ func DefaultSettings() Settings {
 	return NormalizeSettings(Settings{
 		CheckForUpdateOnStartup:   true,
 		AutoRefreshEnabled:        true,
+		AutoSwitchExhausted:       false,
 		AutoRefreshPeakStart:      "08:30",
 		AutoRefreshPeakEnd:        "22:30",
 		AutoRefreshPeakMinutes:    5,
@@ -32,6 +34,7 @@ func NormalizeSettings(settings Settings) Settings {
 	defaults := Settings{
 		CheckForUpdateOnStartup:   settings.CheckForUpdateOnStartup,
 		AutoRefreshEnabled:        settings.AutoRefreshEnabled,
+		AutoSwitchExhausted:       settings.AutoSwitchExhausted,
 		AutoRefreshPeakStart:      normalizeClockValue(settings.AutoRefreshPeakStart, "08:30"),
 		AutoRefreshPeakEnd:        normalizeClockValue(settings.AutoRefreshPeakEnd, "22:30"),
 		AutoRefreshPeakMinutes:    normalizePositiveMinutes(settings.AutoRefreshPeakMinutes, 5),
@@ -61,6 +64,9 @@ func LoadSettings() (Settings, error) {
 	if enabled, ok := root["auto_refresh_enabled"].(bool); ok {
 		settings.AutoRefreshEnabled = enabled
 	}
+	if enabled, ok := root["auto_switch_exhausted"].(bool); ok {
+		settings.AutoSwitchExhausted = enabled
+	}
 	if start, ok := root["auto_refresh_peak_start"].(string); ok {
 		settings.AutoRefreshPeakStart = start
 	}
@@ -88,6 +94,7 @@ func SaveSettings(settings Settings) error {
 	root := map[string]any{
 		"check_for_update_on_startup":   settings.CheckForUpdateOnStartup,
 		"auto_refresh_enabled":          settings.AutoRefreshEnabled,
+		"auto_switch_exhausted":         settings.AutoSwitchExhausted,
 		"auto_refresh_peak_start":       settings.AutoRefreshPeakStart,
 		"auto_refresh_peak_end":         settings.AutoRefreshPeakEnd,
 		"auto_refresh_peak_minutes":     settings.AutoRefreshPeakMinutes,

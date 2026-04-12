@@ -20,6 +20,9 @@ func TestLoadSettingsMissingFileReturnsDefaults(t *testing.T) {
 	if !settings.AutoRefreshEnabled {
 		t.Fatalf("AutoRefreshEnabled = false, want true")
 	}
+	if settings.AutoSwitchExhausted {
+		t.Fatalf("AutoSwitchExhausted = true, want false")
+	}
 	if settings.AutoRefreshPeakStart != "08:30" || settings.AutoRefreshPeakEnd != "22:30" {
 		t.Fatalf("unexpected default peak range: %q-%q", settings.AutoRefreshPeakStart, settings.AutoRefreshPeakEnd)
 	}
@@ -35,6 +38,7 @@ func TestSaveAndLoadSettings(t *testing.T) {
 	initial := Settings{
 		CheckForUpdateOnStartup:   false,
 		AutoRefreshEnabled:        true,
+		AutoSwitchExhausted:       true,
 		AutoRefreshPeakStart:      "09:00",
 		AutoRefreshPeakEnd:        "21:00",
 		AutoRefreshPeakMinutes:    10,
@@ -53,6 +57,9 @@ func TestSaveAndLoadSettings(t *testing.T) {
 	}
 	if loaded.AutoRefreshEnabled != initial.AutoRefreshEnabled {
 		t.Fatalf("AutoRefreshEnabled = %v, want %v", loaded.AutoRefreshEnabled, initial.AutoRefreshEnabled)
+	}
+	if loaded.AutoSwitchExhausted != initial.AutoSwitchExhausted {
+		t.Fatalf("AutoSwitchExhausted = %v, want %v", loaded.AutoSwitchExhausted, initial.AutoSwitchExhausted)
 	}
 	if loaded.AutoRefreshPeakStart != initial.AutoRefreshPeakStart || loaded.AutoRefreshPeakEnd != initial.AutoRefreshPeakEnd {
 		t.Fatalf("unexpected peak range after load: %q-%q", loaded.AutoRefreshPeakStart, loaded.AutoRefreshPeakEnd)

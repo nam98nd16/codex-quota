@@ -69,6 +69,7 @@ type Model struct {
 	pendingUpdateMethod     update.Method
 	hasPendingUpdateMethod  bool
 	autoRefreshScheduledAt  int64
+	PendingSmartSwitchKey   string
 }
 
 type StartupUpdatePrompt struct {
@@ -281,6 +282,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "n":
 			return m.beginAddAccount()
 
+		case "s":
+			return m.beginSmartSwitchActive()
+
 		case "o":
 			return m.beginApplyFlow()
 
@@ -291,8 +295,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.ActiveAccountIx = (m.ActiveAccountIx + 1) % len(m.Accounts)
 				}
-				m.syncActiveAccount()
-				return m, tea.Batch(m.fetchNextCmd(), m.ensureAnimationTickCmd())
+				return m, m.syncAndFetchActiveAccount()
 			}
 
 		case "left", "h", "up", "k":
@@ -302,8 +305,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.ActiveAccountIx = (m.ActiveAccountIx - 1 + len(m.Accounts)) % len(m.Accounts)
 				}
-				m.syncActiveAccount()
-				return m, tea.Batch(m.fetchNextCmd(), m.ensureAnimationTickCmd())
+				return m, m.syncAndFetchActiveAccount()
 			}
 		}
 
@@ -335,6 +337,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resetDeleteState()
 		m.resetApplyState()
 		m.resetSettingsState()
+		m.PendingSmartSwitchKey = ""
 
 		if len(m.Accounts) == 0 {
 			m.Loading = false
@@ -419,7 +422,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.startTabWindowAnimations(msg.AccountKey, prevData, hadPrevData, msg.Data, wasLoading, tabLoadAnimationDuration)
 			}
 		}
+		switchCmd := m.maybeAutoSwitchAfterRefresh(msg.AccountKey)
 		cmds := []tea.Cmd{m.fetchNextCmd(), m.ensureAnimationTickCmd(), m.nextAutoRefreshCmd(time.Now())}
+		if switchCmd != nil {
+			cmds = append(cmds, switchCmd)
+		}
 		if stickyChanged {
 			cmds = append(cmds, SaveUIStateSnapshotCmd(m.uiStateSnapshot()))
 		}
@@ -522,6 +529,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.AutoRefreshPending = make(map[string]bool)
 		}
 		if msg.AccountKey != "" {
+			if msg.AccountKey == m.PendingSmartSwitchKey {
+				m.PendingSmartSwitchKey = ""
+			}
 			fetchedAt := msg.FetchedAt
 			if fetchedAt.IsZero() {
 				fetchedAt = time.Now()

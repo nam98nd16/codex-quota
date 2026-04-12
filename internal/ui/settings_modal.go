@@ -18,6 +18,7 @@ type settingsField int
 
 const (
 	settingsFieldAutoRefresh settingsField = iota
+	settingsFieldAutoSwitchExhausted
 	settingsFieldPeakStart
 	settingsFieldPeakEnd
 	settingsFieldPeakInterval
@@ -60,6 +61,10 @@ func (m *Model) adjustCurrentSettingsField(delta int, toggle bool) {
 	case settingsFieldAutoRefresh:
 		if toggle || delta != 0 {
 			draft.AutoRefreshEnabled = !draft.AutoRefreshEnabled
+		}
+	case settingsFieldAutoSwitchExhausted:
+		if toggle || delta != 0 {
+			draft.AutoSwitchExhausted = !draft.AutoSwitchExhausted
 		}
 	case settingsFieldPeakStart:
 		stepClockValue(&draft.AutoRefreshPeakStart, delta)
@@ -119,6 +124,7 @@ func (m Model) renderSettingsModal() string {
 		value string
 	}{
 		{label: "Auto refresh", value: onOffText(draft.AutoRefreshEnabled)},
+		{label: "Auto switch exhausted", value: onOffText(draft.AutoSwitchExhausted)},
 		{label: "Peak start", value: draft.AutoRefreshPeakStart},
 		{label: "Peak end", value: draft.AutoRefreshPeakEnd},
 		{label: "Peak interval", value: formatMinuteValue(draft.AutoRefreshPeakMinutes)},
@@ -151,6 +157,7 @@ func (m Model) renderSettingsModal() string {
 	}
 	lines = append(lines, "")
 	lines = append(lines, InfoValueStyle.Render("Peak window uses the peak interval; all other times use off-peak."))
+	lines = append(lines, InfoValueStyle.Render("Auto switch exhausted watches the active account and switches/applies when quota is spent."))
 	lines = append(lines, ActionMenuHintStyle.Render("[↑/↓] Move   [←/→] Adjust   [space] Toggle   [enter] Save   [esc] Cancel"))
 
 	return InfoBoxStyle.Copy().Width(actionMenuModalWidth(lines) + 6).Render(strings.Join(lines, "\n"))

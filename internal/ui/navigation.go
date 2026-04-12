@@ -2,6 +2,7 @@ package ui
 
 import (
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -126,5 +127,5 @@ func (m *Model) normalizeActiveAccountForView(activeKey string) {
 
 func (m *Model) syncAndFetchActiveAccount() tea.Cmd {
 	m.syncActiveAccount()
-	return tea.Batch(m.fetchNextCmd(), m.ensureAnimationTickCmd())
+	return tea.Batch(m.fetchNextCmd(), m.ensureAnimationTickCmd(), m.nextAutoRefreshCmd(time.Now()))
 }

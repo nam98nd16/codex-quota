@@ -13,6 +13,7 @@ A TUI for switching between Codex accounts and monitoring quota usage, written i
 - Accounts from local app storage, OpenCode auth, and Codex auth
 - OAuth authentication via browser
 - Two view modes: compact for many accounts, tabs for focused viewing when you have just a few.
+
 ## Installation
 
 Homebrew:
@@ -70,6 +71,7 @@ Additional shortcuts:
 
 - `h` `j` `k` `l` — Vim-style navigation
 - `o` — apply active account to Codex/OpenCode
+- `s` — refresh active account, then switch and apply another if it is exhausted
 - `i` — toggle additional info
 - `n` — add account (OAuth)
 - `x` — delete active account
