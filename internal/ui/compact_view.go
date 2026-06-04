@@ -11,11 +11,35 @@ import (
 	"github.com/deLiseLINO/codex-quota/internal/config"
 )
 
+type compactListRow struct {
+	line         string
+	accountIndex int
+}
+
 func (m Model) renderCompactView() string {
+	return m.renderCompactViewWithin(0)
+}
+
+func (m Model) renderCompactViewWithin(maxRows int) string {
 	if len(m.Accounts) == 0 {
 		return "No accounts.\n"
 	}
 
+	rows := m.compactRows()
+	if maxRows > 0 && len(rows) > maxRows {
+		start := m.clampedCompactScrollOffset(len(rows), maxRows)
+		rows = rows[start:min(start+maxRows, len(rows))]
+	}
+
+	var s strings.Builder
+	for _, row := range rows {
+		s.WriteString(row.line)
+		s.WriteString("\n")
+	}
+	return s.String()
+}
+
+func (m Model) compactRows() []compactListRow {
 	accountWidth := m.compactAccountWidth()
 	normalRows := make([]int, 0, len(m.Accounts))
 	exhaustedRows := make([]int, 0, len(m.Accounts))
@@ -31,26 +55,25 @@ func (m Model) renderCompactView() string {
 		normalRows = append(normalRows, i)
 	}
 
-	var s strings.Builder
-	m.renderCompactRows(&s, normalRows, accountWidth)
+	rows := m.compactAccountRows(normalRows, accountWidth)
 
 	if len(exhaustedRows) > 0 {
 		if len(normalRows) > 0 {
-			s.WriteString("\n")
+			rows = append(rows, compactListRow{accountIndex: -1})
 		}
-		s.WriteString(CompactExhaustedHeaderStyle.Render("Exhausted accounts"))
-		s.WriteString("\n")
-		m.renderCompactRows(&s, exhaustedRows, accountWidth)
+		rows = append(rows, compactListRow{line: CompactExhaustedHeaderStyle.Render("Exhausted accounts"), accountIndex: -1})
+		rows = append(rows, m.compactAccountRows(exhaustedRows, accountWidth)...)
 	}
 
-	return s.String()
+	return rows
 }
 
-func (m Model) renderCompactRows(s *strings.Builder, rowIndexes []int, accountWidth int) {
+func (m Model) compactAccountRows(rowIndexes []int, accountWidth int) []compactListRow {
 	limit := m.preferredContentWidth()
 	if limit <= 0 && m.Width > 0 {
 		limit = m.Width
 	}
+	rows := make([]compactListRow, 0, len(rowIndexes))
 	for _, i := range rowIndexes {
 		if i < 0 || i >= len(m.Accounts) {
 			continue
@@ -65,9 +88,9 @@ func (m Model) renderCompactRows(s *strings.Builder, rowIndexes []int, accountWi
 		if limit > 0 && ansi.StringWidth(row) > limit {
 			row = ansi.Cut(row, 0, limit)
 		}
-		s.WriteString(row)
-		s.WriteString("\n")
+		rows = append(rows, compactListRow{line: row, accountIndex: i})
 	}
+	return rows
 }
 
 func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWidth int) string {

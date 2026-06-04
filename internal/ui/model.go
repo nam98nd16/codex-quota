@@ -58,6 +58,7 @@ type Model struct {
 	SourcesByAccountID       map[string][]string
 	ActiveSourcesByIdentity  map[string][]string
 	ActiveAccountIx          int
+	CompactScrollOffset      int
 	compactBarAnimations     map[string]compactBarAnimation
 	tabWindowAnimations      map[string]tabWindowAnimation
 	animationTicking         bool
@@ -189,6 +190,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, OpenAddAccountLoginURLCmd(m.AddAccountLoginURL)
 			}
 		}
+		if m.compactScrollEnabled() {
+			switch {
+			case msg.Type == tea.MouseWheelUp || msg.Button == tea.MouseButtonWheelUp:
+				m.scrollCompactRows(-compactMouseScrollRows)
+				return m, nil
+			case msg.Type == tea.MouseWheelDown || msg.Button == tea.MouseButtonWheelDown:
+				m.scrollCompactRows(compactMouseScrollRows)
+				return m, nil
+			}
+		}
 
 	case tea.KeyMsg:
 		rawKey := msg.String()
@@ -300,6 +311,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.Accounts) > 1 {
 				if m.CompactMode {
 					m.moveActiveAccountCompact(1)
+					m.ensureCompactActiveVisible()
 				} else {
 					m.ActiveAccountIx = (m.ActiveAccountIx + 1) % len(m.Accounts)
 				}
@@ -310,6 +322,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.Accounts) > 1 {
 				if m.CompactMode {
 					m.moveActiveAccountCompact(-1)
+					m.ensureCompactActiveVisible()
 				} else {
 					m.ActiveAccountIx = (m.ActiveAccountIx - 1 + len(m.Accounts)) % len(m.Accounts)
 				}
@@ -320,6 +333,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
+		m.clampCompactScrollOffset()
 
 		barWidth := msg.Width - 72
 		if barWidth < 20 {
@@ -336,6 +350,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.SourcesByAccountID = msg.SourcesByAccountID
 		m.ActiveSourcesByIdentity = msg.ActiveSourcesByIdentity
 		m.ActiveAccountIx = 0
+		m.CompactScrollOffset = 0
 		m.Data = api.UsageData{}
 		m.pruneCompactBarAnimations()
 		m.pruneKnownPlanTypes()

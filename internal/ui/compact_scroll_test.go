@@ -1,0 +1,92 @@
+package ui
+
+import (
+	"fmt"
+	"strings"
+	"testing"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
+
+	"github.com/deLiseLINO/codex-quota/internal/api"
+	"github.com/deLiseLINO/codex-quota/internal/config"
+)
+
+func TestCompactMouseWheelScrollsViewport(t *testing.T) {
+	m := testCompactScrollModel(20, 140, 18)
+
+	updated, _ := m.Update(tea.MouseMsg{Type: tea.MouseWheelDown, Button: tea.MouseButtonWheelDown})
+	got := updated.(Model)
+	if got.CompactScrollOffset != compactMouseScrollRows {
+		t.Fatalf("CompactScrollOffset = %d, want %d", got.CompactScrollOffset, compactMouseScrollRows)
+	}
+
+	updated, _ = got.Update(tea.MouseMsg{Type: tea.MouseWheelUp, Button: tea.MouseButtonWheelUp})
+	got = updated.(Model)
+	if got.CompactScrollOffset != 0 {
+		t.Fatalf("CompactScrollOffset = %d, want 0 after wheel up", got.CompactScrollOffset)
+	}
+}
+
+func TestCompactViewClipsLargeListsAndKeepsFooter(t *testing.T) {
+	m := testCompactScrollModel(30, 140, 18)
+
+	out := ansi.Strip(m.View())
+	if height := lipgloss.Height(out); height > m.Height {
+		t.Fatalf("view height = %d, want <= %d\n%s", height, m.Height, out)
+	}
+	if !strings.Contains(out, "Move/Scroll") || !strings.Contains(out, "Enter Menu") {
+		t.Fatalf("expected footer to remain visible, got:\n%s", out)
+	}
+	if strings.Contains(out, "user29@example.com") {
+		t.Fatalf("expected tail account to be clipped before scrolling, got:\n%s", out)
+	}
+}
+
+func TestCompactKeyboardNavigationKeepsActiveRowVisible(t *testing.T) {
+	m := testCompactScrollModel(20, 140, 16)
+
+	var updated tea.Model = m
+	for i := 0; i < 15; i++ {
+		updated, _ = updated.(Model).Update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+	got := updated.(Model)
+
+	out := ansi.Strip(got.View())
+	if !strings.Contains(out, "> user15@example.com") {
+		t.Fatalf("expected active account to be visible after keyboard navigation, got:\n%s", out)
+	}
+	if got.CompactScrollOffset == 0 {
+		t.Fatalf("expected compact scroll offset to advance")
+	}
+}
+
+func testCompactScrollModel(count, width, height int) Model {
+	accounts := make([]*config.Account, 0, count)
+	usage := make(map[string]api.UsageData, count)
+	for i := 0; i < count; i++ {
+		key := fmt.Sprintf("managed:%02d", i)
+		label := fmt.Sprintf("user%02d@example.com", i)
+		accounts = append(accounts, &config.Account{
+			Key:       key,
+			Label:     label,
+			Email:     label,
+			AccountID: fmt.Sprintf("acc-%02d", i),
+			Source:    config.SourceManaged,
+			Writable:  true,
+		})
+		usage[key] = api.UsageData{Windows: []api.QuotaWindow{{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 95.0, ResetAt: time.Now().Add(2 * time.Hour)}}}
+	}
+
+	m := InitialModel(accounts, map[string][]string{}, map[string][]string{}, true)
+	m.Width = width
+	m.Height = height
+	m.Loading = false
+	m.LoadingMap = map[string]bool{}
+	m.ErrorsMap = map[string]error{}
+	m.UsageData = usage
+	m.Data = usage[accounts[0].Key]
+	return m
+}

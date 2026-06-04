@@ -288,6 +288,7 @@ func (m *Model) selectActiveAccountByKey(accountKey string) bool {
 			continue
 		}
 		m.ActiveAccountIx = index
+		m.ensureCompactActiveVisible()
 		return true
 	}
 	return false

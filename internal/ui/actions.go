@@ -202,8 +202,10 @@ func (m Model) toggleViewMode() (tea.Model, tea.Cmd) {
 	m.CompactMode = !m.CompactMode
 	if m.CompactMode {
 		m.clearTabWindowAnimations()
+		m.ensureCompactActiveVisible()
 	} else {
 		m.clearCompactBarAnimations()
+		m.CompactScrollOffset = 0
 	}
 	m.resetHelpState()
 	m.resetActionMenuState()

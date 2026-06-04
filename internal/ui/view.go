@@ -12,6 +12,7 @@ const headerUpdateHintGap = 6
 func (m Model) View() string {
 	var s strings.Builder
 	modal := m.currentOverlayModal()
+	footer := HelpStyle.Render("\n" + m.renderFooter())
 
 	s.WriteString(m.renderHeader())
 	s.WriteString("\n")
@@ -26,7 +27,7 @@ func (m Model) View() string {
 	}
 
 	if m.CompactMode {
-		s.WriteString(m.renderCompactView())
+		s.WriteString(m.renderCompactViewWithin(m.compactListViewportHeight()))
 	} else {
 		if m.Loading {
 			s.WriteString(m.renderWindowsLoadingSkeleton())
@@ -37,7 +38,6 @@ func (m Model) View() string {
 		}
 	}
 
-	footer := HelpStyle.Render("\n" + m.renderFooter())
 	s.WriteString(footer)
 
 	content := s.String()
@@ -106,7 +106,7 @@ func (m Model) renderHeader() string {
 
 func (m Model) renderFooter() string {
 	if m.CompactMode {
-		return "↑↓ Move • Enter Menu • ? Help • q Quit"
+		return "↑↓ Move/Scroll • Enter Menu • ? Help • q Quit"
 	}
 	return "←→ Move • Enter Menu • ? Help • q Quit"
 }
