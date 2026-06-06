@@ -19,17 +19,18 @@ func (m Model) renderCompactRowsWithin(viewportHeight int) string {
 	start := m.clampedCompactScrollOffset(len(rows), capacity)
 	visible := rows[start:min(start+capacity, len(rows))]
 	columnLineWidth := compactColumnLineWidth(columnWidth)
+	leftCount := (len(visible) + 1) / 2
 
 	var s strings.Builder
-	for i := 0; i < viewportHeight && i < len(visible); i++ {
+	for i := 0; i < viewportHeight && i < leftCount; i++ {
 		left := visible[i].line
-		rightIndex := i + viewportHeight
+		rightIndex := i + leftCount
+		s.WriteString(padANSI(left, columnLineWidth))
+		s.WriteString(strings.Repeat(" ", gap))
 		if rightIndex < len(visible) {
-			s.WriteString(padANSI(left, columnLineWidth))
-			s.WriteString(strings.Repeat(" ", gap))
 			s.WriteString(visible[rightIndex].line)
 		} else {
-			s.WriteString(left)
+			s.WriteString(strings.Repeat(" ", columnLineWidth))
 		}
 		s.WriteString("\n")
 	}

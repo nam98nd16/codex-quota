@@ -134,6 +134,40 @@ func TestCompactWideScrollClampsToTwoColumnCapacity(t *testing.T) {
 	}
 }
 
+func TestCompactWideViewBalancesShortTwoColumnPage(t *testing.T) {
+	m := testCompactScrollModel(14, 170, 18)
+	viewportHeight := m.compactListViewportHeight()
+	if viewportHeight >= len(m.compactRows()) {
+		t.Fatalf("test requires more rows than viewport height")
+	}
+	if m.compactVisibleRowCapacity() <= len(m.compactRows()) {
+		t.Fatalf("test requires rows to fit within two-column capacity")
+	}
+
+	rendered := ansi.Strip(m.renderCompactViewWithin(viewportHeight))
+	lines := compactNonEmptyLines(rendered)
+	wantLines := (len(m.compactRows()) + 1) / 2
+	if len(lines) != wantLines {
+		t.Fatalf("rendered lines = %d, want balanced two-column lines = %d\n%s", len(lines), wantLines, rendered)
+	}
+	for _, line := range lines {
+		if strings.Count(line, "user") != 2 {
+			t.Fatalf("expected every balanced row to contain both columns, got line %q\n%s", line, rendered)
+		}
+	}
+}
+
+func compactNonEmptyLines(rendered string) []string {
+	lines := []string{}
+	for _, line := range strings.Split(rendered, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
 func testCompactScrollModel(count, width, height int) Model {
 	accounts := make([]*config.Account, 0, count)
 	usage := make(map[string]api.UsageData, count)
