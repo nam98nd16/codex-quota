@@ -25,18 +25,7 @@ func (m Model) renderCompactViewWithin(maxRows int) string {
 		return "No accounts.\n"
 	}
 
-	rows := m.compactRows()
-	if maxRows > 0 && len(rows) > maxRows {
-		start := m.clampedCompactScrollOffset(len(rows), maxRows)
-		rows = rows[start:min(start+maxRows, len(rows))]
-	}
-
-	var s strings.Builder
-	for _, row := range rows {
-		s.WriteString(row.line)
-		s.WriteString("\n")
-	}
-	return s.String()
+	return m.renderCompactRowsWithin(maxRows)
 }
 
 func (m Model) compactRows() []compactListRow {

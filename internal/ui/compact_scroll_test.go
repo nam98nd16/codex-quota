@@ -63,6 +63,77 @@ func TestCompactKeyboardNavigationKeepsActiveRowVisible(t *testing.T) {
 	}
 }
 
+func TestCompactWideViewUsesTwoColumns(t *testing.T) {
+	m := testCompactScrollModel(40, 170, 18)
+	columns, _, _ := m.compactColumnLayout()
+	if columns != 2 {
+		t.Fatalf("compact columns = %d, want 2", columns)
+	}
+
+	viewportHeight := m.compactListViewportHeight()
+	out := ansi.Strip(m.View())
+	if !strings.Contains(out, fmt.Sprintf("user%02d@", viewportHeight)) {
+		t.Fatalf("expected second column account to be visible, got:\n%s", out)
+	}
+	if height := lipgloss.Height(out); height > m.Height {
+		t.Fatalf("view height = %d, want <= %d\n%s", height, m.Height, out)
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if width := ansi.StringWidth(line); width > m.Width {
+			t.Fatalf("line width = %d, want <= %d\n%s", width, m.Width, line)
+		}
+	}
+}
+
+func TestCompactNarrowViewStaysSingleColumn(t *testing.T) {
+	m := testCompactScrollModel(40, 160, 18)
+	columns, _, _ := m.compactColumnLayout()
+	if columns != 1 {
+		t.Fatalf("compact columns = %d, want 1", columns)
+	}
+
+	viewportHeight := m.compactListViewportHeight()
+	out := ansi.Strip(m.View())
+	if strings.Contains(out, fmt.Sprintf("user%02d@", viewportHeight)) {
+		t.Fatalf("did not expect second-column account in narrow view, got:\n%s", out)
+	}
+}
+
+func TestCompactWideKeyboardNavigationKeepsSecondColumnActiveVisible(t *testing.T) {
+	m := testCompactScrollModel(40, 170, 18)
+	viewportHeight := m.compactListViewportHeight()
+	steps := viewportHeight + 1
+
+	var updated tea.Model = m
+	for i := 0; i < steps; i++ {
+		updated, _ = updated.(Model).Update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+	got := updated.(Model)
+
+	out := ansi.Strip(got.View())
+	activeLabel := fmt.Sprintf("> user%02d@example", steps)
+	if !strings.Contains(out, activeLabel) {
+		t.Fatalf("expected second-column active account %q to be visible, got:\n%s", activeLabel, out)
+	}
+	if got.CompactScrollOffset != 0 {
+		t.Fatalf("CompactScrollOffset = %d, want 0 while active row fits in second column", got.CompactScrollOffset)
+	}
+}
+
+func TestCompactWideScrollClampsToTwoColumnCapacity(t *testing.T) {
+	m := testCompactScrollModel(40, 170, 18)
+	capacity := m.compactVisibleRowCapacity()
+	want := len(m.compactRows()) - capacity
+	if want < 0 {
+		want = 0
+	}
+
+	m.scrollCompactRows(999)
+	if m.CompactScrollOffset != want {
+		t.Fatalf("CompactScrollOffset = %d, want %d", m.CompactScrollOffset, want)
+	}
+}
+
 func testCompactScrollModel(count, width, height int) Model {
 	accounts := make([]*config.Account, 0, count)
 	usage := make(map[string]api.UsageData, count)

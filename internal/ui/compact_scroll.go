@@ -26,11 +26,11 @@ func (m Model) compactViewPrefix() string {
 	return prefix
 }
 
-func (m Model) clampedCompactScrollOffset(rowCount, viewportHeight int) int {
-	if viewportHeight <= 0 || rowCount <= viewportHeight {
+func (m Model) clampedCompactScrollOffset(rowCount, visibleCapacity int) int {
+	if visibleCapacity <= 0 || rowCount <= visibleCapacity {
 		return 0
 	}
-	maxOffset := rowCount - viewportHeight
+	maxOffset := rowCount - visibleCapacity
 	if m.CompactScrollOffset < 0 {
 		return 0
 	}
@@ -45,7 +45,7 @@ func (m *Model) clampCompactScrollOffset() {
 		m.CompactScrollOffset = 0
 		return
 	}
-	m.CompactScrollOffset = m.clampedCompactScrollOffset(len(m.compactRows()), m.compactListViewportHeight())
+	m.CompactScrollOffset = m.clampedCompactScrollOffset(len(m.compactRows()), m.compactVisibleRowCapacity())
 }
 
 func (m *Model) scrollCompactRows(delta int) {
@@ -56,6 +56,10 @@ func (m *Model) scrollCompactRows(delta int) {
 func (m *Model) ensureCompactActiveVisible() {
 	viewportHeight := m.compactListViewportHeight()
 	if viewportHeight <= 0 {
+		return
+	}
+	capacity := m.compactVisibleRowCapacity()
+	if capacity <= 0 {
 		return
 	}
 
@@ -72,14 +76,26 @@ func (m *Model) ensureCompactActiveVisible() {
 		return
 	}
 
-	offset := m.clampedCompactScrollOffset(len(rows), viewportHeight)
+	offset := m.clampedCompactScrollOffset(len(rows), capacity)
 	if activeRow < offset {
 		offset = activeRow
-	} else if activeRow >= offset+viewportHeight {
-		offset = activeRow - viewportHeight + 1
+	} else if activeRow >= offset+capacity {
+		offset = activeRow - capacity + 1
 	}
 	m.CompactScrollOffset = offset
 	m.clampCompactScrollOffset()
+}
+
+func (m Model) compactVisibleRowCapacity() int {
+	viewportHeight := m.compactListViewportHeight()
+	if viewportHeight <= 0 {
+		return 0
+	}
+	columns, _, _ := m.compactColumnLayout()
+	if columns < 1 {
+		columns = 1
+	}
+	return viewportHeight * columns
 }
 
 func (m Model) compactScrollEnabled() bool {
