@@ -174,8 +174,7 @@ func InitialModelWithStartupUpdate(
 }
 
 func (m Model) Init() tea.Cmd {
-	titleCmd := tea.SetWindowTitle("🚀 Codex Quota")
-	cmds := []tea.Cmd{titleCmd}
+	cmds := []tea.Cmd{}
 	if account := m.activeAccount(); account != nil {
 		cmds = append(cmds, FetchDataCmd(account, false), m.fetchNextCmd(), m.nextAutoRefreshCmd(time.Now()))
 	}

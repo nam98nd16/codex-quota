@@ -110,7 +110,7 @@ func TestInitSchedulesTwoFetchesWhenMultipleAccounts(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected tea.BatchMsg from init cmd, got %T", msg)
 	}
-	if len(batch) != 3 {
-		t.Fatalf("expected 3 startup commands (title + 2 fetches), got %d", len(batch))
+	if len(batch) != 2 {
+		t.Fatalf("expected 2 startup commands (active fetch + queued fetches), got %d", len(batch))
 	}
 }
