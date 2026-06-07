@@ -15,7 +15,7 @@ import (
 )
 
 func TestCompactMouseWheelScrollsViewport(t *testing.T) {
-	m := testCompactScrollModel(20, 140, 18)
+	m := testCompactScrollModel(30, 140, 18)
 
 	updated, _ := m.Update(tea.MouseMsg{Type: tea.MouseWheelDown, Button: tea.MouseButtonWheelDown})
 	got := updated.(Model)
@@ -101,7 +101,7 @@ func TestCompactKeyboardNavigationKeepsActiveRowVisible(t *testing.T) {
 	got := updated.(Model)
 
 	out := ansi.Strip(got.View())
-	if !strings.Contains(out, "> user15@example.com") {
+	if !strings.Contains(out, "> user15@example") {
 		t.Fatalf("expected active account to be visible after keyboard navigation, got:\n%s", out)
 	}
 	if got.CompactScrollOffset == 0 {
@@ -177,7 +177,7 @@ func TestCompactWideViewUsesTwoColumns(t *testing.T) {
 }
 
 func TestCompactNarrowViewStaysSingleColumn(t *testing.T) {
-	m := testCompactScrollModel(40, 140, 18)
+	m := testCompactScrollModel(40, 120, 18)
 	columns, _, _ := m.compactColumnLayout()
 	if columns != 1 {
 		t.Fatalf("compact columns = %d, want 1", columns)

@@ -9,13 +9,13 @@ import (
 )
 
 func TestCompactColumnLayoutSupportsThreeAndFourColumns(t *testing.T) {
-	m := testCompactScrollModel(80, 240, 24)
+	m := testCompactScrollModel(80, 200, 24)
 	columns, _, _ := m.compactColumnLayout()
 	if columns != 3 {
 		t.Fatalf("compact columns = %d, want 3", columns)
 	}
 
-	m.Width = 320
+	m.Width = 266
 	columns, _, _ = m.compactColumnLayout()
 	if columns != 4 {
 		t.Fatalf("compact columns = %d, want 4", columns)
@@ -23,7 +23,7 @@ func TestCompactColumnLayoutSupportsThreeAndFourColumns(t *testing.T) {
 }
 
 func TestCompactExhaustedHeaderSpansFullWidthInMultiColumn(t *testing.T) {
-	m := testCompactScrollModel(24, 240, 24)
+	m := testCompactScrollModel(24, 200, 24)
 	for i := 18; i < 24; i++ {
 		m.ExhaustedSticky[m.Accounts[i].Key] = true
 	}
@@ -48,7 +48,7 @@ func TestCompactExhaustedHeaderSpansFullWidthInMultiColumn(t *testing.T) {
 }
 
 func TestCompactFourColumnRowsStayAlignedAndWithinWidth(t *testing.T) {
-	m := testCompactScrollModel(80, 320, 24)
+	m := testCompactScrollModel(80, 266, 24)
 	rendered := ansi.Strip(m.renderCompactViewWithin(m.compactListViewportHeight()))
 	contentWidth := m.compactContentWidth()
 
@@ -66,7 +66,7 @@ func TestCompactFourColumnRowsStayAlignedAndWithinWidth(t *testing.T) {
 }
 
 func TestCompactActiveExhaustedAccountRemainsVisibleInMultiColumn(t *testing.T) {
-	m := testCompactScrollModel(24, 240, 24)
+	m := testCompactScrollModel(24, 200, 24)
 	for i := 18; i < 24; i++ {
 		m.ExhaustedSticky[m.Accounts[i].Key] = true
 	}

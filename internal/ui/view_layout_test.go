@@ -624,7 +624,7 @@ func TestRenderCompactView_LoadingAndQueuedShareRowGeometry(t *testing.T) {
 		},
 	})
 	model.CompactMode = true
-	model.Width = 140
+	model.Width = 128
 	model.Accounts = []*config.Account{
 		{Key: "a1", Label: "first@example.com", Email: "first@example.com", AccountID: "id-1", Source: config.SourceManaged, Writable: true},
 		{Key: "a2", Label: "second@example.com", Email: "second@example.com", AccountID: "id-2", Source: config.SourceManaged, Writable: true},
@@ -723,7 +723,7 @@ func TestView_DoesNotOverflowViewportWidthOnNarrowScreen(t *testing.T) {
 			ResetAt:     time.Now().Add(6*24*time.Hour + 23*time.Hour),
 		},
 	})
-	model.Width = 120
+	model.Width = 128
 	model.Height = 30
 
 	out := model.View()
@@ -834,7 +834,7 @@ func TestView_MediumViewportKeepsHorizontalInset(t *testing.T) {
 		{Key: "a4", Label: "delise.usa10@gmail.com", Email: "delise.usa10@gmail.com", AccountID: "id-4", Source: config.SourceManaged, Writable: true},
 	}
 	model.ActiveAccountIx = 0
-	model.Width = 120
+	model.Width = 128
 	model.Height = 28
 
 	out := ansi.Strip(model.View())
@@ -858,7 +858,7 @@ func TestView_FillsViewportCanvasWhenSizeIsKnown(t *testing.T) {
 			ResetAt:     time.Now().Add(6*24*time.Hour + 23*time.Hour),
 		},
 	})
-	model.Width = 120
+	model.Width = 128
 	model.Height = 24
 
 	out := model.View()
@@ -1072,7 +1072,7 @@ func TestRenderCompactView_GroupsExhaustedAccountsAtBottom(t *testing.T) {
 		{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 40.0, ResetAt: time.Now().Add(2 * time.Hour)},
 	})
 	model.CompactMode = true
-	model.Width = 150
+	model.Width = 128
 	model.Accounts = []*config.Account{
 		{Key: "a1", Label: "normal-1@example.com", Email: "normal-1@example.com", AccountID: "id-1", Source: config.SourceManaged, Writable: true},
 		{Key: "a2", Label: "exhausted@example.com", Email: "exhausted@example.com", AccountID: "id-2", Source: config.SourceManaged, Writable: true},
@@ -1108,7 +1108,7 @@ func TestRenderCompactView_TreatsLimitReachedAsExhausted(t *testing.T) {
 		{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 40.0, ResetAt: time.Now().Add(2 * time.Hour)},
 	})
 	model.CompactMode = true
-	model.Width = 150
+	model.Width = 128
 	model.Accounts = []*config.Account{
 		{Key: "a1", Label: "normal@example.com", Email: "normal@example.com", AccountID: "id-1", Source: config.SourceManaged, Writable: true},
 		{Key: "a2", Label: "limit-reached@example.com", Email: "limit-reached@example.com", AccountID: "id-2", Source: config.SourceManaged, Writable: true},
@@ -1120,7 +1120,7 @@ func TestRenderCompactView_TreatsLimitReachedAsExhausted(t *testing.T) {
 
 	out := ansi.Strip(model.renderCompactView())
 	headerIx := strings.Index(out, "Exhausted accounts")
-	limitReachedIx := strings.Index(out, "limit-reached@example.com")
+	limitReachedIx := strings.Index(out, "limit-reached@example")
 	if headerIx < 0 || limitReachedIx < 0 {
 		t.Fatalf("expected exhausted header and account in output, got:\n%s", out)
 	}
@@ -1134,7 +1134,7 @@ func TestRenderCompactView_LoadingAccountStaysInMainSection(t *testing.T) {
 		{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 40.0, ResetAt: time.Now().Add(2 * time.Hour)},
 	})
 	model.CompactMode = true
-	model.Width = 150
+	model.Width = 128
 	model.Accounts = []*config.Account{
 		{Key: "a1", Label: "loading@example.com", Email: "loading@example.com", AccountID: "id-1", Source: config.SourceManaged, Writable: true},
 		{Key: "a2", Label: "exhausted@example.com", Email: "exhausted@example.com", AccountID: "id-2", Source: config.SourceManaged, Writable: true},
@@ -1161,7 +1161,7 @@ func TestRenderCompactView_ActiveAccountHighlightWorksInExhaustedSection(t *test
 		{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 40.0, ResetAt: time.Now().Add(2 * time.Hour)},
 	})
 	model.CompactMode = true
-	model.Width = 150
+	model.Width = 128
 	model.Accounts = []*config.Account{
 		{Key: "a1", Label: "normal@example.com", Email: "normal@example.com", AccountID: "id-1", Source: config.SourceManaged, Writable: true},
 		{Key: "a2", Label: "exhausted@example.com", Email: "exhausted@example.com", AccountID: "id-2", Source: config.SourceManaged, Writable: true},

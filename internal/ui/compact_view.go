@@ -252,11 +252,12 @@ func (m Model) compactAccountWidthForViewport(width int) int {
 }
 
 func (m Model) compactRowLayout(leftWidth int) (barWidth, percentWidth, resetWidth int) {
-	barWidth = m.defaultBarWidth()
+	contentWidth := m.preferredContentWidth()
+	barWidth = min(m.defaultBarWidth(), compactBarMaxWidth(contentWidth))
 	percentWidth = 5
-	resetWidth = 14
+	resetWidth = compactResetWidth(contentWidth)
 
-	available := m.preferredContentWidth() - leftWidth
+	available := contentWidth - leftWidth
 	if available <= 0 {
 		return 6, 3, 0
 	}
@@ -295,4 +296,32 @@ func (m Model) compactRowLayout(leftWidth int) (barWidth, percentWidth, resetWid
 	percentWidth = reduce(percentWidth, minPercentWidth)
 
 	return
+}
+
+func compactBarMaxWidth(contentWidth int) int {
+	switch {
+	case contentWidth <= 60:
+		return 18
+	case contentWidth <= 72:
+		return 22
+	case contentWidth <= 88:
+		return 26
+	case contentWidth <= 120:
+		return 32
+	default:
+		return 40
+	}
+}
+
+func compactResetWidth(contentWidth int) int {
+	switch {
+	case contentWidth <= 60:
+		return 10
+	case contentWidth <= 72:
+		return 11
+	case contentWidth <= 88:
+		return 12
+	default:
+		return 14
+	}
 }

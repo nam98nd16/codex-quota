@@ -3,9 +3,9 @@ package ui
 import "strings"
 
 const (
-	compactColumnGap              = 3
+	compactColumnGap              = 2
 	compactMaxColumns             = 4
-	compactMinColumnViewportWidth = 76
+	compactMinColumnViewportWidth = 64
 )
 
 type compactListSection struct {
@@ -69,7 +69,8 @@ func (m Model) compactRenderedLines(viewportHeight int, columns int, columnWidth
 }
 
 func (m Model) compactListSectionsForWidth(width int) []compactListSection {
-	accountWidth := m.compactAccountWidthForViewport(width)
+	lineWidth := compactColumnLineWidth(width)
+	accountWidth := m.compactAccountWidthForViewport(lineWidth)
 	normalRows := make([]int, 0, len(m.Accounts))
 	exhaustedRows := make([]int, 0, len(m.Accounts))
 
@@ -86,12 +87,12 @@ func (m Model) compactListSectionsForWidth(width int) []compactListSection {
 
 	sections := []compactListSection{}
 	if len(normalRows) > 0 {
-		sections = append(sections, compactListSection{rows: m.compactAccountRowsForWidth(normalRows, accountWidth, width)})
+		sections = append(sections, compactListSection{rows: m.compactAccountRowsForWidth(normalRows, accountWidth, lineWidth)})
 	}
 	if len(exhaustedRows) > 0 {
 		sections = append(sections, compactListSection{
 			header: CompactExhaustedHeaderStyle.Render("Exhausted accounts"),
-			rows:   m.compactAccountRowsForWidth(exhaustedRows, accountWidth, width),
+			rows:   m.compactAccountRowsForWidth(exhaustedRows, accountWidth, lineWidth),
 		})
 	}
 	return sections
