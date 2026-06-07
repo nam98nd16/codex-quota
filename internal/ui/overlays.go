@@ -263,7 +263,7 @@ func (m Model) renderHelpModal() string {
 			renderHelpLine("Ctrl+A/E", "Jump first/last without Home/End keys"),
 			renderHelpLine("Ctrl+F", "Search accounts"),
 			renderHelpLine("f", "Cycle filter: all/available/exhausted/errors"),
-			renderHelpLine("g", "Cycle sort: default/quota/reset/source/status"),
+			renderHelpLine("g", "Cycle sort: subscriptions/original/quota/reset/source/status"),
 			renderHelpLine("p", "Pin/unpin applied accounts"),
 			renderHelpLine("e", "Collapse/expand exhausted accounts"),
 			renderHelpLine("d", "Show compact quota details"),

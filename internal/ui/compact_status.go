@@ -35,6 +35,7 @@ func (m Model) renderCompactRecordsStatus() string {
 
 	status += fmt.Sprintf(" • Filter %s", m.compactFilterLabel())
 	status += fmt.Sprintf(" • Sort %s", m.compactSortLabel())
+	status += fmt.Sprintf(" • Subscriptions %d", m.compactSubscriptionCount())
 	if m.CompactPinApplied {
 		status += " • Pinned applied"
 	}
@@ -131,6 +132,19 @@ func (m Model) compactRecordCounts() (loading, errors, exhausted int) {
 		}
 	}
 	return loading, errors, exhausted
+}
+
+func (m Model) compactSubscriptionCount() int {
+	count := 0
+	for _, accountIndex := range m.compactVisualOrderIndices() {
+		if accountIndex < 0 || accountIndex >= len(m.Accounts) {
+			continue
+		}
+		if m.hasSubscription(m.Accounts[accountIndex]) {
+			count++
+		}
+	}
+	return count
 }
 
 func (m Model) compactActiveStatusParts() []string {

@@ -24,12 +24,15 @@ const (
 type compactSortMode int
 
 const (
-	compactSortDefault compactSortMode = iota
+	compactSortSubscriptions compactSortMode = iota
+	compactSortOriginal
 	compactSortQuota
 	compactSortReset
 	compactSortSource
 	compactSortStatus
 )
+
+const compactSortModeCount = 6
 
 type compactIndexSection struct {
 	header  string
@@ -136,13 +139,15 @@ func (m Model) compactAccountHasForegroundError(account *config.Account) bool {
 }
 
 func (m Model) sortCompactIndices(indices []int) {
-	if m.CompactSort == compactSortDefault || len(indices) < 2 {
+	if m.CompactSort == compactSortOriginal || len(indices) < 2 {
 		return
 	}
 	sort.SliceStable(indices, func(left, right int) bool {
 		leftAccount := m.Accounts[indices[left]]
 		rightAccount := m.Accounts[indices[right]]
 		switch m.CompactSort {
+		case compactSortSubscriptions:
+			return m.compactSubscriptionSortLess(leftAccount, rightAccount)
 		case compactSortQuota:
 			return m.compactQuotaSortKey(leftAccount) < m.compactQuotaSortKey(rightAccount)
 		case compactSortReset:
@@ -155,6 +160,28 @@ func (m Model) sortCompactIndices(indices []int) {
 			return false
 		}
 	})
+}
+
+func (m Model) compactSubscriptionSortLess(left, right *config.Account) bool {
+	leftSubscribed := m.hasSubscription(left)
+	rightSubscribed := m.hasSubscription(right)
+	if leftSubscribed != rightSubscribed {
+		return leftSubscribed
+	}
+
+	leftQuota := m.compactQuotaSortKey(left)
+	rightQuota := m.compactQuotaSortKey(right)
+	if leftQuota != rightQuota {
+		return leftQuota < rightQuota
+	}
+
+	leftReset := m.compactResetSortKey(left)
+	rightReset := m.compactResetSortKey(right)
+	if leftReset != rightReset {
+		return leftReset < rightReset
+	}
+
+	return m.compactNameSortKey(left) < m.compactNameSortKey(right)
 }
 
 func (m Model) compactQuotaSortKey(account *config.Account) float64 {
@@ -184,7 +211,14 @@ func (m Model) compactSourceSortKey(account *config.Account) string {
 	if account == nil {
 		return ""
 	}
-	return strings.ToLower(account.SourceLabel() + " " + m.displayAccountLabel(account))
+	return strings.ToLower(account.SourceLabel() + " " + m.compactNameSortKey(account))
+}
+
+func (m Model) compactNameSortKey(account *config.Account) string {
+	if account == nil {
+		return ""
+	}
+	return strings.ToLower(m.displayAccountLabel(account))
 }
 
 func (m Model) compactStatusSortKey(account *config.Account) string {
@@ -219,6 +253,10 @@ func (m Model) compactFilterLabel() string {
 
 func (m Model) compactSortLabel() string {
 	switch m.CompactSort {
+	case compactSortSubscriptions:
+		return "subscriptions"
+	case compactSortOriginal:
+		return "original"
 	case compactSortQuota:
 		return "quota"
 	case compactSortReset:
@@ -228,7 +266,7 @@ func (m Model) compactSortLabel() string {
 	case compactSortStatus:
 		return "status"
 	default:
-		return "default"
+		return "subscriptions"
 	}
 }
 
@@ -238,7 +276,7 @@ func (m *Model) cycleCompactFilter() {
 }
 
 func (m *Model) cycleCompactSort() {
-	m.CompactSort = compactSortMode((int(m.CompactSort) + 1) % 5)
+	m.CompactSort = compactSortMode((int(m.CompactSort) + 1) % compactSortModeCount)
 	m.normalizeCompactControls()
 }
 

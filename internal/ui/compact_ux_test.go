@@ -33,6 +33,48 @@ func TestCompactSearchFilterAndSortControls(t *testing.T) {
 	}
 }
 
+func TestCompactDefaultSortPrioritizesSubscriptionsThenQuotaResetName(t *testing.T) {
+	now := time.Now()
+	accounts := []*config.Account{
+		{Key: "free-low", Label: "zeta@example.com", Email: "zeta@example.com", AccountID: "free-low", Source: config.SourceManaged, Writable: true},
+		{Key: "sub-late", Label: "bravo@example.com", Email: "bravo@example.com", AccountID: "sub-late", Source: config.SourceManaged, Writable: true},
+		{Key: "sub-high", Label: "alpha@example.com", Email: "alpha@example.com", AccountID: "sub-high", Source: config.SourceManaged, Writable: true},
+		{Key: "sub-early", Label: "charlie@example.com", Email: "charlie@example.com", AccountID: "sub-early", Source: config.SourceManaged, Writable: true},
+		{Key: "sub-name-a", Label: "aaron@example.com", Email: "aaron@example.com", AccountID: "sub-name-a", Source: config.SourceManaged, Writable: true},
+		{Key: "sub-name-b", Label: "zoe@example.com", Email: "zoe@example.com", AccountID: "sub-name-b", Source: config.SourceManaged, Writable: true},
+	}
+	m := InitialModel(accounts, map[string][]string{}, map[string][]string{}, true)
+	m.Loading = false
+	m.LoadingMap = map[string]bool{}
+	m.ErrorsMap = map[string]error{}
+	m.PlanTypeByAccount = map[string]string{
+		"sub-late":   "team",
+		"sub-high":   "team",
+		"sub-early":  "team",
+		"sub-name-a": "team",
+		"sub-name-b": "team",
+	}
+	m.UsageData = map[string]api.UsageData{
+		"free-low":   {Windows: []api.QuotaWindow{{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 1, ResetAt: now.Add(time.Hour)}}},
+		"sub-late":   {Windows: []api.QuotaWindow{{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 10, ResetAt: now.Add(3 * time.Hour)}}},
+		"sub-high":   {Windows: []api.QuotaWindow{{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 20, ResetAt: now.Add(time.Hour)}}},
+		"sub-early":  {Windows: []api.QuotaWindow{{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 10, ResetAt: now.Add(2 * time.Hour)}}},
+		"sub-name-a": {Windows: []api.QuotaWindow{{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 30, ResetAt: now.Add(4 * time.Hour)}}},
+		"sub-name-b": {Windows: []api.QuotaWindow{{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 30, ResetAt: now.Add(4 * time.Hour)}}},
+	}
+
+	got := m.compactVisualOrderIndices()
+	want := []int{3, 1, 2, 4, 5, 0}
+	if len(got) != len(want) {
+		t.Fatalf("default subscription sort length = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("default subscription sort = %v, want %v", got, want)
+		}
+	}
+}
+
 func TestCompactPinnedAndCollapsedSections(t *testing.T) {
 	m := compactUXTestModel()
 	m.ActiveSourcesByIdentity = map[string][]string{
@@ -60,12 +102,14 @@ func TestCompactPinnedAndCollapsedSections(t *testing.T) {
 
 func TestCompactStatusDensityAndDetailModal(t *testing.T) {
 	m := compactUXTestModel()
+	m.Width = 220
+	m.PlanTypeByAccount = map[string]string{"a1": "team"}
 	m.CompactSearchQuery = "alpha"
 	m.CompactSort = compactSortReset
 	m.CompactFilter = compactFilterAvailable
 
 	detailed := ansi.Strip(m.renderCompactRecordsStatus())
-	for _, want := range []string{"Search \"alpha\"", "Filter available", "Sort reset"} {
+	for _, want := range []string{"Search \"alpha\"", "Filter available", "Sort reset", "Subscriptions 1"} {
 		if !strings.Contains(detailed, want) {
 			t.Fatalf("expected detailed status to contain %q:\n%s", want, detailed)
 		}
@@ -91,7 +135,7 @@ func TestCompactMouseHitTestingSelectsRows(t *testing.T) {
 	m.Width = 120
 	m.Height = 30
 	m.CompactPinApplied = false
-	m.CompactSort = compactSortDefault
+	m.CompactSort = compactSortOriginal
 
 	x, y := compactScreenPointContaining(t, m, "beta@example")
 	if got := m.compactAccountIndexAtPoint(x, y); got != 1 {
@@ -107,7 +151,7 @@ func TestCompactMouseHitTestingAccountsForCenteredTallLayout(t *testing.T) {
 	m.Width = 220
 	m.Height = 60
 	m.CompactPinApplied = false
-	m.CompactSort = compactSortDefault
+	m.CompactSort = compactSortOriginal
 
 	x, y := compactScreenPointContaining(t, m, "beta@example")
 	if got := m.compactAccountIndexAtPoint(x, y); got != 1 {
@@ -120,7 +164,7 @@ func TestCompactMouseHitTestingSelectsWideColumns(t *testing.T) {
 	m.Width = 220
 	m.Height = 30
 	m.CompactPinApplied = false
-	m.CompactSort = compactSortDefault
+	m.CompactSort = compactSortOriginal
 
 	x, y := compactScreenPointContaining(t, m, "gamma@example")
 	if got := m.compactAccountIndexAtPoint(x, y); got != 2 {
