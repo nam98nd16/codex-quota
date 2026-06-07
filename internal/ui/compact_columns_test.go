@@ -74,7 +74,7 @@ func TestCompactActiveExhaustedAccountRemainsVisibleInMultiColumn(t *testing.T) 
 	m.ensureCompactActiveVisible()
 
 	rendered := ansi.Strip(m.renderCompactViewWithin(m.compactListViewportHeight()))
-	if !strings.Contains(rendered, "> user23@example") {
+	if !strings.Contains(rendered, "● user23@example") {
 		t.Fatalf("expected active exhausted account to remain visible:\n%s", rendered)
 	}
 }

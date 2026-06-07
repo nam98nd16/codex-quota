@@ -30,6 +30,8 @@ const (
 func (m *Model) openSettingsOverlay() {
 	m.resetHelpState()
 	m.resetActionMenuState()
+	m.closeCompactDetail()
+	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.ShowInfo = false

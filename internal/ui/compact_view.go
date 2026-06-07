@@ -31,28 +31,19 @@ func (m Model) renderCompactViewWithin(maxRows int) string {
 
 func (m Model) compactRows() []compactListRow {
 	accountWidth := m.compactAccountWidth()
-	normalRows := make([]int, 0, len(m.Accounts))
-	exhaustedRows := make([]int, 0, len(m.Accounts))
-
-	for i, acc := range m.Accounts {
-		if acc == nil {
-			continue
-		}
-		if m.isCompactAccountExhausted(acc.Key) {
-			exhaustedRows = append(exhaustedRows, i)
-			continue
-		}
-		normalRows = append(normalRows, i)
+	rows := []compactListRow{}
+	sections := m.compactIndexSections()
+	if len(sections) == 0 {
+		return []compactListRow{{line: ActionMenuHintStyle.Render("No matching accounts"), accountIndex: -1}}
 	}
-
-	rows := m.compactAccountRows(normalRows, accountWidth)
-
-	if len(exhaustedRows) > 0 {
-		if len(normalRows) > 0 {
-			rows = append(rows, compactListRow{accountIndex: -1})
+	for _, section := range sections {
+		if section.header != "" {
+			if len(rows) > 0 {
+				rows = append(rows, compactListRow{accountIndex: -1})
+			}
+			rows = append(rows, compactListRow{line: CompactExhaustedHeaderStyle.Render(section.header), accountIndex: -1})
 		}
-		rows = append(rows, compactListRow{line: CompactExhaustedHeaderStyle.Render("Exhausted accounts"), accountIndex: -1})
-		rows = append(rows, m.compactAccountRows(exhaustedRows, accountWidth)...)
+		rows = append(rows, m.compactAccountRows(section.indices, accountWidth)...)
 	}
 
 	return rows
@@ -98,7 +89,7 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 	isActive := index == m.ActiveAccountIx
 	prefix := "  "
 	if isActive {
-		prefix = "> "
+		prefix = "● "
 	}
 
 	name := m.displayAccountLabel(acc)
@@ -148,7 +139,7 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 	s.WriteString(" ")
 
 	if err := m.ErrorsMap[acc.Key]; err != nil && !(m.BackgroundErrorMap[acc.Key] && hasRenderableQuotaData(m.UsageData[acc.Key])) {
-		status := truncateLabel("Error: "+err.Error(), 24)
+		status := "Error: " + compactErrorText(err)
 		s.WriteString(m.renderCompactStatusRow(status, subscribed, barWidth, percentWidth, resetWidth))
 		return s.String()
 	}
@@ -173,7 +164,7 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 	gradientStart, gradientEnd := barGradientForWindow(window.WindowSec)
 	s.WriteString(renderSmoothBar(barWidth, ratio, gradientStart, gradientEnd))
 	s.WriteString(" ")
-	s.WriteString(m.renderCompactPercent(fmt.Sprintf("%.0f%%", window.LeftPercent), subscribed, percentWidth))
+	s.WriteString(m.renderCompactPercentValue(window.LeftPercent, subscribed, percentWidth))
 	reset := truncateLabelStrict(compactResetText(window.ResetAt), resetWidth)
 	if resetWidth > 0 && strings.TrimSpace(reset) != "" {
 		s.WriteString(ResetTimeStyle.Copy().Width(resetWidth).Render(reset))
@@ -206,13 +197,28 @@ func hasRenderableQuotaData(data api.UsageData) bool {
 }
 
 func (m Model) renderCompactStatusRow(status string, subscribed bool, barWidth, percentWidth, resetWidth int) string {
-	row := renderSmoothBar(barWidth, 0, defaultBarGradientStart, defaultBarGradientEnd)
-	row += " "
-	row += m.renderCompactPercent("...", subscribed, percentWidth)
-	if resetWidth > 0 {
-		row += ResetTimeStyle.Copy().Width(resetWidth).Render(truncateLabelStrict(status, resetWidth))
+	statusWidth := barWidth + 1 + percentWidth
+	style := ActionMenuHintStyle.Copy().Width(statusWidth)
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(status)), "error") {
+		style = ErrorStyle.Copy().Width(statusWidth)
 	}
-	return TabInactiveStyle.Render(row)
+	row := style.Render(truncateLabelStrict(compactPlaceholderStatus(status), statusWidth))
+	if resetWidth > 0 {
+		row += ResetTimeStyle.Copy().Width(resetWidth).Render("")
+	}
+	return row
+}
+
+func compactPlaceholderStatus(status string) string {
+	switch strings.TrimSpace(status) {
+	case "Loading...":
+		return "loading"
+	case "Queued...":
+		return "queued"
+	case "No quota data":
+		return "no quota"
+	}
+	return strings.TrimSpace(status)
 }
 
 func (m Model) renderCompactPercent(value string, subscribed bool, width int) string {
@@ -223,6 +229,26 @@ func (m Model) renderCompactPercent(value string, subscribed bool, width int) st
 	}
 
 	return style.Copy().Foreground(lipgloss.Color("177")).Render(value)
+}
+
+func (m Model) renderCompactPercentValue(leftPercent float64, subscribed bool, width int) string {
+	value := fmt.Sprintf("%.0f%%", leftPercent)
+	style := compactPercentSeverityStyle(leftPercent).Copy().Width(width)
+	if subscribed && leftPercent > 25 {
+		style = style.Foreground(lipgloss.Color("177"))
+	}
+	return style.Render(truncateLabelStrict(value, width))
+}
+
+func compactPercentSeverityStyle(leftPercent float64) lipgloss.Style {
+	switch {
+	case leftPercent <= 10:
+		return PercentDangerStyle
+	case leftPercent <= 25:
+		return PercentWarningStyle
+	default:
+		return PercentStyle
+	}
 }
 
 func (m Model) compactAccountWidth() int {

@@ -32,20 +32,11 @@ func (m Model) compactVisualOrderIndices() []int {
 	if len(m.Accounts) == 0 {
 		return nil
 	}
-
-	normal := make([]int, 0, len(m.Accounts))
-	exhausted := make([]int, 0, len(m.Accounts))
-	for i, acc := range m.Accounts {
-		if acc == nil {
-			continue
-		}
-		if m.isCompactAccountExhausted(acc.Key) {
-			exhausted = append(exhausted, i)
-		} else {
-			normal = append(normal, i)
-		}
+	order := make([]int, 0, len(m.Accounts))
+	for _, section := range m.compactIndexSections() {
+		order = append(order, section.indices...)
 	}
-	return append(normal, exhausted...)
+	return order
 }
 
 func (m *Model) moveActiveAccountCompact(delta int) {

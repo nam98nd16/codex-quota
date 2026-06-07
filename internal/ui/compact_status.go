@@ -11,13 +11,43 @@ import (
 func (m Model) renderCompactRecordsStatus() string {
 	first, last, total := m.compactVisibleRecordRange()
 	if total == 0 {
-		return ActionMenuHintStyle.Render("Records 0 / 0")
+		status := "Records 0 / 0"
+		if query := strings.TrimSpace(m.CompactSearchQuery); query != "" {
+			status += fmt.Sprintf(" • Search %q", truncateLabelStrict(query, 24))
+		}
+		if m.CompactFilter != compactFilterAll {
+			status += fmt.Sprintf(" • Filter %s", m.compactFilterLabel())
+		}
+		return ActionMenuHintStyle.Render(status)
 	}
 
 	status := fmt.Sprintf("Records %d-%d / %d", first, last, total)
+	if query := strings.TrimSpace(m.CompactSearchQuery); query != "" {
+		status += fmt.Sprintf(" • Search %q", truncateLabelStrict(query, 24))
+	}
+	if m.CompactStatusMinimal {
+		activeParts := m.compactActiveStatusParts()
+		if len(activeParts) > 0 {
+			status += " • " + activeParts[0]
+		}
+		return m.renderCompactStatusText(status)
+	}
+
+	status += fmt.Sprintf(" • Filter %s", m.compactFilterLabel())
+	status += fmt.Sprintf(" • Sort %s", m.compactSortLabel())
+	if m.CompactPinApplied {
+		status += " • Pinned applied"
+	}
+	if m.CompactExhaustedCollapsed {
+		status += " • Exhausted collapsed"
+	}
 	loading, errors, exhausted := m.compactRecordCounts()
+	refreshing := m.compactRefreshingCount()
 	if loading > 0 {
 		status += fmt.Sprintf(" • Loading %d", loading)
+	}
+	if refreshing > 0 {
+		status += fmt.Sprintf(" • Refreshing %d", refreshing)
 	}
 	if errors > 0 {
 		status += fmt.Sprintf(" • Errors %d", errors)
@@ -29,6 +59,10 @@ func (m Model) renderCompactRecordsStatus() string {
 		status += " • " + part
 	}
 
+	return m.renderCompactStatusText(status)
+}
+
+func (m Model) renderCompactStatusText(status string) string {
 	limit := m.preferredContentWidth()
 	if limit > 0 && ansi.StringWidth(status) > limit {
 		status = ansi.Cut(status, 0, limit)

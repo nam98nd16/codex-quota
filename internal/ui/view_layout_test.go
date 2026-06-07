@@ -491,10 +491,10 @@ func TestRenderCompactView_MixedRowsStayAligned(t *testing.T) {
 		t.Fatalf("expected non-empty rendered view")
 	}
 
-	if !strings.Contains(out, "Loading...") {
+	if !strings.Contains(out, "loading") {
 		t.Fatalf("expected loading status in compact view")
 	}
-	if !strings.Contains(out, "Queued...") {
+	if !strings.Contains(out, "queued") {
 		t.Fatalf("expected queued status in compact view")
 	}
 	if !strings.Contains(out, "30%") {
@@ -515,7 +515,7 @@ func TestRenderCompactView_NarrowWidthRendersWithoutBreakage(t *testing.T) {
 	model.Width = 72
 
 	out := ansi.Strip(model.renderCompactView())
-	if !strings.Contains(out, "Loading...") {
+	if !strings.Contains(out, "loading") {
 		t.Fatalf("expected loading state in narrow mode output:\n%s", out)
 	}
 	if !strings.Contains(out, "user@example.com") {
@@ -657,6 +657,29 @@ func TestRenderCompactView_LoadingAndQueuedShareRowGeometry(t *testing.T) {
 	}
 	if diff > 1 {
 		t.Fatalf("expected loading and queued rows to have near-equal width, got %d vs %d", loadingWidth, queuedWidth)
+	}
+}
+
+func TestRenderCompactView_LoadingAndQueuedRowsStayQuiet(t *testing.T) {
+	model := testModelWithWindows([]api.QuotaWindow{{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 30.0, ResetAt: time.Now().Add(2 * time.Hour)}})
+	model.CompactMode = true
+	model.Width = 128
+	model.Accounts = []*config.Account{
+		{Key: "a1", Label: "first@example.com", Email: "first@example.com", AccountID: "id-1", Source: config.SourceManaged, Writable: true},
+		{Key: "a2", Label: "second@example.com", Email: "second@example.com", AccountID: "id-2", Source: config.SourceManaged, Writable: true},
+	}
+	model.LoadingMap = map[string]bool{"a1": true}
+	model.UsageData = map[string]api.UsageData{}
+	model.ErrorsMap = map[string]error{}
+
+	out := ansi.Strip(model.renderCompactView())
+	for _, line := range strings.Split(out, "\n") {
+		if !strings.Contains(line, "loading") && !strings.Contains(line, "queued") {
+			continue
+		}
+		if strings.Contains(line, "····") || strings.Contains(line, "...") {
+			t.Fatalf("expected quiet placeholder row without dotted bar/ellipsis, got %q\n%s", line, out)
+		}
 	}
 }
 
@@ -1173,7 +1196,7 @@ func TestRenderCompactView_ActiveAccountHighlightWorksInExhaustedSection(t *test
 	}
 
 	out := ansi.Strip(model.renderCompactView())
-	if !strings.Contains(out, "> exhausted@example.com") {
+	if !strings.Contains(out, "● exhausted@example.com") {
 		t.Fatalf("expected active marker in exhausted section, got:\n%s", out)
 	}
 }

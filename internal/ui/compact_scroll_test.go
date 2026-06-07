@@ -37,7 +37,7 @@ func TestCompactViewClipsLargeListsAndKeepsFooter(t *testing.T) {
 	if height := lipgloss.Height(out); height > m.Height {
 		t.Fatalf("view height = %d, want <= %d\n%s", height, m.Height, out)
 	}
-	if !strings.Contains(out, "Ctrl+U/D Page") || !strings.Contains(out, "Enter Menu") {
+	if !strings.Contains(out, "Ctrl+F Search") || !strings.Contains(out, "Enter Menu") {
 		t.Fatalf("expected footer to remain visible, got:\n%s", out)
 	}
 	if !strings.Contains(out, "Records 1-") || !strings.Contains(out, "/ 30") {
@@ -101,7 +101,7 @@ func TestCompactKeyboardNavigationKeepsActiveRowVisible(t *testing.T) {
 	got := updated.(Model)
 
 	out := ansi.Strip(got.View())
-	if !strings.Contains(out, "> user15@example") {
+	if !strings.Contains(out, "● user15@example") {
 		t.Fatalf("expected active account to be visible after keyboard navigation, got:\n%s", out)
 	}
 	if got.CompactScrollOffset == 0 {
@@ -202,7 +202,7 @@ func TestCompactWideKeyboardNavigationKeepsSecondColumnActiveVisible(t *testing.
 	got := updated.(Model)
 
 	out := ansi.Strip(got.View())
-	activeLabel := fmt.Sprintf("> user%02d@example", steps)
+	activeLabel := fmt.Sprintf("● user%02d@example", steps)
 	if !strings.Contains(out, activeLabel) {
 		t.Fatalf("expected second-column active account %q to be visible, got:\n%s", activeLabel, out)
 	}

@@ -49,6 +49,8 @@ func (m Model) beginSmartSwitchActive() (tea.Model, tea.Cmd) {
 	m.resetHelpState()
 	m.resetActionMenuState()
 	m.resetSettingsState()
+	m.closeCompactDetail()
+	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.Notice = ""

@@ -129,17 +129,46 @@ func TestRenderActionMenuModalListsPrimaryActions(t *testing.T) {
 	if !strings.Contains(out, "Account actions") {
 		t.Fatalf("expected action menu title:\n%s", out)
 	}
+	if !strings.Contains(out, "Active: user1@example.com") {
+		t.Fatalf("expected active account context:\n%s", out)
+	}
 	if !strings.Contains(out, "Current account") || !strings.Contains(out, "Global actions") {
 		t.Fatalf("expected grouped action menu sections:\n%s", out)
 	}
-	if !strings.Contains(out, "Apply to Codex/OpenCode") || !strings.Contains(out, "Delete account") {
+	if !strings.Contains(out, "Apply selected account") || !strings.Contains(out, "Delete account") {
 		t.Fatalf("expected account actions in menu:\n%s", out)
 	}
 	if !strings.Contains(out, "Refresh all") || !strings.Contains(out, "Switch view") || !strings.Contains(out, "Add account") || !strings.Contains(out, "Settings") {
 		t.Fatalf("expected global actions in menu:\n%s", out)
 	}
-	if !strings.Contains(out, "1. Apply to Codex/OpenCode") || !strings.Contains(out, "5. Refresh all") {
+	if !strings.Contains(out, "1. Apply selected account") || !strings.Contains(out, "5. Refresh all") {
 		t.Fatalf("expected sequential numbering across sections:\n%s", out)
+	}
+}
+
+func TestRenderActionMenuModalShowsAppliedTargets(t *testing.T) {
+	m := testModelForHotkeys(1)
+	m.ActionMenuVisible = true
+	m.ActiveSourcesByIdentity = map[string][]string{
+		"email-account:user1@example.com|acc-1": {"codex", "opencode"},
+	}
+
+	out := ansi.Strip(m.renderActionMenuModal())
+	if !strings.Contains(out, "Applied: Codex, OpenCode") {
+		t.Fatalf("expected applied target context:\n%s", out)
+	}
+}
+
+func TestRenderHelpModalExplainsSourceBadges(t *testing.T) {
+	m := testModelForHotkeys(1)
+	m.CompactMode = true
+	m.HelpVisible = true
+
+	out := ansi.Strip(m.renderHelpModal())
+	for _, want := range []string{"Badges", "[C]", "Applied in Codex", "[O]", "Applied in OpenCode", "↻"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected help modal to contain %q:\n%s", want, out)
+		}
 	}
 }
 
@@ -168,7 +197,7 @@ func TestRenderActionMenuModalKeepsShortcutColumnAlignedForLongLabels(t *testing
 	applyLine := ""
 	switchViewLine := ""
 	for _, line := range lines {
-		if strings.Contains(line, "Apply to Codex/OpenCode") {
+		if strings.Contains(line, "Apply selected account") {
 			applyLine = line
 		}
 		if strings.Contains(line, "Switch view") {

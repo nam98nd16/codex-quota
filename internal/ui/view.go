@@ -107,13 +107,16 @@ func (m Model) renderHeader() string {
 
 func (m Model) renderFooter() string {
 	if m.CompactMode {
+		if m.CompactSearchActive {
+			return "Search: type to filter • Enter Close • Esc Cancel • Ctrl+U Clear"
+		}
 		if m.Width >= 118 {
-			return "↑↓ Move • Fn+↑↓/Ctrl+U/D Page • Fn+←→/Ctrl+A/E Jump • Enter Menu • ? Help • q Quit"
+			return "↑↓ Move • Ctrl+F Search • f Filter • g Sort • d Detail • Enter Menu • ? Help • q Quit"
 		}
 		if m.Width >= 84 {
-			return "↑↓ Move • Ctrl+U/D Page • Ctrl+A/E Jump • Enter Menu • ? Help • q Quit"
+			return "↑↓ Move • Ctrl+F Search • f Filter • g Sort • d Detail • ? Help"
 		}
-		return "↑↓ Move • Ctrl+U/D Page • Enter Menu • ? Help"
+		return "↑↓ Move • Ctrl+F Search • Enter Menu • ? Help"
 	}
 	return "←→ Move • Enter Menu • ? Help • q Quit"
 }

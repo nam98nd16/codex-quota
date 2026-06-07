@@ -14,65 +14,73 @@ import (
 )
 
 type Model struct {
-	defaultProgress          progress.Model
-	shortProgress            progress.Model
-	Data                     api.UsageData
-	Loading                  bool
-	DeleteSourceSelect       bool
-	DeleteSourceOptions      []config.Source
-	DeleteSources            map[config.Source]bool
-	DeleteSourceCursor       int
-	DeleteConfirm            bool
-	ApplyTargetSelect        bool
-	ApplyTargets             map[config.Source]bool
-	ApplyTargetCursor        int
-	ApplyConfirm             bool
-	Settings                 config.Settings
-	SettingsVisible          bool
-	SettingsDraft            config.Settings
-	SettingsCursor           int
-	HelpVisible              bool
-	ActionMenuVisible        bool
-	ActionMenuCursor         int
-	AddAccountLoginVisible   bool
-	AddAccountLoginURL       string
-	AddAccountBrowserFailed  bool
-	AddAccountLoginStatus    string
-	ShowInfo                 bool
-	Notice                   string
-	noticeSeq                int
-	Err                      error
-	Width                    int
-	Height                   int
-	CompactMode              bool
-	UsageData                map[string]api.UsageData
-	PlanTypeByAccount        map[string]string
-	LoadingMap               map[string]bool
-	BackgroundLoadingMap     map[string]bool
-	ErrorsMap                map[string]error
-	BackgroundErrorMap       map[string]bool
-	ExhaustedSticky          map[string]bool
-	LastQuotaFetchAt         map[string]time.Time
-	AutoRefreshPending       map[string]bool
-	Accounts                 []*config.Account
-	SourcesByAccountID       map[string][]string
-	ActiveSourcesByIdentity  map[string][]string
-	ActiveAccountIx          int
-	CompactScrollOffset      int
-	compactBarAnimations     map[string]compactBarAnimation
-	tabWindowAnimations      map[string]tabWindowAnimation
-	animationTicking         bool
-	UpdatePromptVisible      bool
-	UpdatePromptVersion      string
-	UpdatePromptMethod       update.Method
-	UpdatePromptCursor       int
-	UpdateAvailableHint      string
-	pendingUpdateMethod      update.Method
-	hasPendingUpdateMethod   bool
-	autoRefreshScheduledAt   int64
-	PendingSmartSwitchKeys   map[string]bool
-	PendingSmartSwitchManual bool
-	SmartSwitchBurstPending  map[string]bool
+	defaultProgress           progress.Model
+	shortProgress             progress.Model
+	Data                      api.UsageData
+	Loading                   bool
+	DeleteSourceSelect        bool
+	DeleteSourceOptions       []config.Source
+	DeleteSources             map[config.Source]bool
+	DeleteSourceCursor        int
+	DeleteConfirm             bool
+	ApplyTargetSelect         bool
+	ApplyTargets              map[config.Source]bool
+	ApplyTargetCursor         int
+	ApplyConfirm              bool
+	Settings                  config.Settings
+	SettingsVisible           bool
+	SettingsDraft             config.Settings
+	SettingsCursor            int
+	HelpVisible               bool
+	ActionMenuVisible         bool
+	ActionMenuCursor          int
+	AddAccountLoginVisible    bool
+	AddAccountLoginURL        string
+	AddAccountBrowserFailed   bool
+	AddAccountLoginStatus     string
+	ShowInfo                  bool
+	Notice                    string
+	noticeSeq                 int
+	Err                       error
+	Width                     int
+	Height                    int
+	CompactMode               bool
+	UsageData                 map[string]api.UsageData
+	PlanTypeByAccount         map[string]string
+	LoadingMap                map[string]bool
+	BackgroundLoadingMap      map[string]bool
+	ErrorsMap                 map[string]error
+	BackgroundErrorMap        map[string]bool
+	ExhaustedSticky           map[string]bool
+	LastQuotaFetchAt          map[string]time.Time
+	AutoRefreshPending        map[string]bool
+	Accounts                  []*config.Account
+	SourcesByAccountID        map[string][]string
+	ActiveSourcesByIdentity   map[string][]string
+	ActiveAccountIx           int
+	CompactScrollOffset       int
+	CompactSearchActive       bool
+	CompactSearchQuery        string
+	CompactFilter             compactFilterMode
+	CompactSort               compactSortMode
+	CompactPinApplied         bool
+	CompactExhaustedCollapsed bool
+	CompactStatusMinimal      bool
+	CompactDetailVisible      bool
+	compactBarAnimations      map[string]compactBarAnimation
+	tabWindowAnimations       map[string]tabWindowAnimation
+	animationTicking          bool
+	UpdatePromptVisible       bool
+	UpdatePromptVersion       string
+	UpdatePromptMethod        update.Method
+	UpdatePromptCursor        int
+	UpdateAvailableHint       string
+	pendingUpdateMethod       update.Method
+	hasPendingUpdateMethod    bool
+	autoRefreshScheduledAt    int64
+	PendingSmartSwitchKeys    map[string]bool
+	PendingSmartSwitchManual  bool
+	SmartSwitchBurstPending   map[string]bool
 }
 
 type StartupUpdatePrompt struct {
@@ -131,6 +139,7 @@ func InitialModelWithStartupUpdate(
 		ActiveSourcesByIdentity: activeSourcesByIdentity,
 		ActiveAccountIx:         0,
 		CompactMode:             uiState.CompactMode,
+		CompactPinApplied:       true,
 		UsageData:               make(map[string]api.UsageData),
 		PlanTypeByAccount:       make(map[string]string),
 		LoadingMap:              make(map[string]bool),
@@ -189,6 +198,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, OpenAddAccountLoginURLCmd(m.AddAccountLoginURL)
 			}
 		}
+		if m.compactClickEnabled() && msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			if m.selectCompactAccountAtPoint(msg.X, msg.Y) {
+				return m, m.syncAndFetchActiveAccount()
+			}
+		}
 		if m.compactScrollEnabled() {
 			switch {
 			case msg.Type == tea.MouseWheelUp || msg.Button == tea.MouseButtonWheelUp:
@@ -216,8 +230,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.AddAccountLoginVisible {
 			return m.handleAddAccountLogin(keyStr)
 		}
+		if m.CompactDetailVisible {
+			return m.handleCompactDetailOverlay(keyStr)
+		}
 		if m.ActionMenuVisible {
 			return m.handleActionMenu(keyStr)
+		}
+		if m.CompactSearchActive {
+			return m.handleCompactSearch(msg)
 		}
 		if m.DeleteSourceSelect {
 			return m.handleDeleteSourceSelection(keyStr)
@@ -230,6 +250,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.ApplyConfirm {
 			return m.handleApplyConfirm(keyStr)
+		}
+		if m.CompactMode {
+			if updated, cmd, handled := m.handleCompactControlKey(keyStr); handled {
+				return updated, cmd
+			}
 		}
 
 		switch keyStr {
@@ -284,6 +309,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "i":
 			m.resetHelpState()
 			m.resetActionMenuState()
+			m.closeCompactDetail()
 			m.ShowInfo = !m.ShowInfo
 			m.resetDeleteState()
 			m.resetApplyState()

@@ -32,8 +32,21 @@ func (m Model) compactRenderedLines(viewportHeight int, columns int, columnWidth
 	start := m.clampedCompactScrollOffset(len(m.compactVisualOrderIndices()), m.compactVisibleRowCapacity())
 	skip := start
 	lines := []compactListRow{}
+	sections := m.compactListSectionsForWidth(columnWidth)
+	if len(sections) == 0 {
+		return []compactListRow{{line: ActionMenuHintStyle.Render("No matching accounts"), accountIndex: -1}}
+	}
 
-	for _, section := range m.compactListSectionsForWidth(columnWidth) {
+	for _, section := range sections {
+		if len(section.rows) == 0 {
+			if section.header != "" && skip == 0 {
+				if viewportHeight > 0 && len(lines) >= viewportHeight {
+					break
+				}
+				lines = append(lines, compactListRow{line: section.header, accountIndex: -1})
+			}
+			continue
+		}
 		if skip >= len(section.rows) {
 			skip -= len(section.rows)
 			continue
@@ -71,28 +84,15 @@ func (m Model) compactRenderedLines(viewportHeight int, columns int, columnWidth
 func (m Model) compactListSectionsForWidth(width int) []compactListSection {
 	lineWidth := compactColumnLineWidth(width)
 	accountWidth := m.compactAccountWidthForViewport(lineWidth)
-	normalRows := make([]int, 0, len(m.Accounts))
-	exhaustedRows := make([]int, 0, len(m.Accounts))
-
-	for i, acc := range m.Accounts {
-		if acc == nil {
-			continue
-		}
-		if m.isCompactAccountExhausted(acc.Key) {
-			exhaustedRows = append(exhaustedRows, i)
-			continue
-		}
-		normalRows = append(normalRows, i)
-	}
-
 	sections := []compactListSection{}
-	if len(normalRows) > 0 {
-		sections = append(sections, compactListSection{rows: m.compactAccountRowsForWidth(normalRows, accountWidth, lineWidth)})
-	}
-	if len(exhaustedRows) > 0 {
+	for _, section := range m.compactIndexSections() {
+		header := ""
+		if section.header != "" {
+			header = CompactExhaustedHeaderStyle.Render(section.header)
+		}
 		sections = append(sections, compactListSection{
-			header: CompactExhaustedHeaderStyle.Render("Exhausted accounts"),
-			rows:   m.compactAccountRowsForWidth(exhaustedRows, accountWidth, lineWidth),
+			header: header,
+			rows:   m.compactAccountRowsForWidth(section.indices, accountWidth, lineWidth),
 		})
 	}
 	return sections

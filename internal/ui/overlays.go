@@ -30,6 +30,10 @@ func (m Model) currentOverlayModal() string {
 		return m.renderActionMenuModal()
 	}
 
+	if m.CompactDetailVisible {
+		return m.renderCompactDetailModal()
+	}
+
 	if m.ShowInfo {
 		return m.renderInfoModal()
 	}
@@ -257,6 +261,18 @@ func (m Model) renderHelpModal() string {
 			renderHelpLine("Ctrl+U/D", "Page records without Page keys"),
 			renderHelpLine("Home/End", "Jump first/last; on Mac use Fn+←/→"),
 			renderHelpLine("Ctrl+A/E", "Jump first/last without Home/End keys"),
+			renderHelpLine("Ctrl+F", "Search accounts"),
+			renderHelpLine("f", "Cycle filter: all/available/exhausted/errors"),
+			renderHelpLine("g", "Cycle sort: default/quota/reset/source/status"),
+			renderHelpLine("p", "Pin/unpin applied accounts"),
+			renderHelpLine("e", "Collapse/expand exhausted accounts"),
+			renderHelpLine("d", "Show compact quota details"),
+			renderHelpLine("z", "Toggle status density"),
+			"",
+			HelpSectionStyle.Render("Badges"),
+			renderHelpLine("[C]", "Applied in Codex"),
+			renderHelpLine("[O]", "Applied in OpenCode"),
+			renderHelpLine("↻", "Refreshing in background"),
 			"",
 		)
 		width = 68
@@ -370,7 +386,10 @@ func (m Model) renderActionMenuModal() string {
 
 	if account := m.activeAccount(); account != nil {
 		label := m.displayAccountLabel(account)
-		lines = append(lines, InfoValueStyle.Render(truncateLabel(label, 44)))
+		lines = append(lines, InfoValueStyle.Render("Active: "+truncateLabel(label, 44)))
+		if badges := m.activeSourceBadgesForAccount(account); badges != "" {
+			lines = append(lines, ActionMenuHintStyle.Render("Applied: "+sourceBadgeLegendText(badges)))
+		}
 	}
 	lines = append(lines, "")
 

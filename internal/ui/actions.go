@@ -59,6 +59,8 @@ func (m Model) confirmActionMenu() (tea.Model, tea.Cmd) {
 func (m *Model) openHelpOverlay() {
 	m.resetSettingsState()
 	m.resetActionMenuState()
+	m.closeCompactDetail()
+	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.ShowInfo = false
@@ -74,6 +76,8 @@ func (m *Model) resetHelpState() {
 func (m *Model) openActionMenu() {
 	m.resetHelpState()
 	m.resetSettingsState()
+	m.closeCompactDetail()
+	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.ShowInfo = false
@@ -97,6 +101,8 @@ func (m *Model) openUpdatePrompt() bool {
 	m.resetHelpState()
 	m.resetSettingsState()
 	m.resetActionMenuState()
+	m.closeCompactDetail()
+	m.closeCompactSearch()
 	m.ShowInfo = false
 	m.Notice = ""
 	m.Err = nil
@@ -141,6 +147,8 @@ func (m Model) beginDeleteFlow() (tea.Model, tea.Cmd) {
 
 	m.resetActionMenuState()
 	m.resetHelpState()
+	m.closeCompactDetail()
+	m.closeCompactSearch()
 	m.startDeleteFlow(sources)
 	m.ShowInfo = false
 	m.Err = nil
@@ -157,6 +165,8 @@ func (m Model) beginRefreshActive() (tea.Model, tea.Cmd) {
 	m.resetHelpState()
 	m.resetActionMenuState()
 	m.resetSettingsState()
+	m.closeCompactDetail()
+	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.Notice = ""
@@ -180,6 +190,8 @@ func (m Model) beginRefreshAll() (tea.Model, tea.Cmd) {
 	m.resetHelpState()
 	m.resetActionMenuState()
 	m.resetSettingsState()
+	m.closeCompactDetail()
+	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.Notice = ""
@@ -210,6 +222,8 @@ func (m Model) toggleViewMode() (tea.Model, tea.Cmd) {
 	m.resetHelpState()
 	m.resetActionMenuState()
 	m.resetSettingsState()
+	m.closeCompactDetail()
+	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.Notice = ""
@@ -225,6 +239,8 @@ func (m Model) beginAddAccount() (tea.Model, tea.Cmd) {
 	m.resetHelpState()
 	m.resetActionMenuState()
 	m.resetSettingsState()
+	m.closeCompactDetail()
+	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.ShowInfo = false
@@ -239,6 +255,8 @@ func (m Model) beginApplyFlow() (tea.Model, tea.Cmd) {
 	m.resetHelpState()
 	m.resetActionMenuState()
 	m.resetDeleteState()
+	m.closeCompactDetail()
+	m.closeCompactSearch()
 	m.startApplyFlow()
 	m.ShowInfo = false
 	m.Notice = ""

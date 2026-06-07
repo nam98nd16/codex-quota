@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -45,5 +46,17 @@ func TestRenderSmoothBarZeroAndFull(t *testing.T) {
 	full := ansi.Strip(renderSmoothBar(8, 1, defaultBarGradientStart, defaultBarGradientEnd))
 	if full != strings.Repeat("█", 8) {
 		t.Fatalf("expected fully filled bar, got %q", full)
+	}
+}
+
+func TestCompactPercentSeverityStyle(t *testing.T) {
+	if got, want := fmt.Sprint(compactPercentSeverityStyle(8).GetForeground()), fmt.Sprint(PercentDangerStyle.GetForeground()); got != want {
+		t.Fatalf("danger foreground = %s, want %s", got, want)
+	}
+	if got, want := fmt.Sprint(compactPercentSeverityStyle(20).GetForeground()), fmt.Sprint(PercentWarningStyle.GetForeground()); got != want {
+		t.Fatalf("warning foreground = %s, want %s", got, want)
+	}
+	if got, want := fmt.Sprint(compactPercentSeverityStyle(80).GetForeground()), fmt.Sprint(PercentStyle.GetForeground()); got != want {
+		t.Fatalf("normal foreground = %s, want %s", got, want)
 	}
 }

@@ -28,6 +28,14 @@ var (
 			Width(8).
 			Align(lipgloss.Right).
 			Foreground(lipgloss.Color("170"))
+	PercentWarningStyle = lipgloss.NewStyle().
+				Width(8).
+				Align(lipgloss.Right).
+				Foreground(lipgloss.Color("214"))
+	PercentDangerStyle = lipgloss.NewStyle().
+				Width(8).
+				Align(lipgloss.Right).
+				Foreground(lipgloss.Color("196"))
 
 	ResetTimeStyle = lipgloss.NewStyle().
 			Width(26).

@@ -102,11 +102,15 @@ func (m Model) compactScrollEnabled() bool {
 	if !m.CompactMode || len(m.Accounts) == 0 {
 		return false
 	}
-	if m.UpdatePromptVisible || m.HelpVisible || m.SettingsVisible || m.AddAccountLoginVisible || m.ActionMenuVisible || m.ShowInfo {
+	if m.UpdatePromptVisible || m.HelpVisible || m.SettingsVisible || m.AddAccountLoginVisible || m.ActionMenuVisible || m.ShowInfo || m.CompactDetailVisible || m.CompactSearchActive {
 		return false
 	}
 	if m.DeleteSourceSelect || m.DeleteConfirm || m.ApplyTargetSelect || m.ApplyConfirm {
 		return false
 	}
 	return m.Err == nil && m.Notice == ""
+}
+
+func (m Model) compactClickEnabled() bool {
+	return m.compactScrollEnabled()
 }
