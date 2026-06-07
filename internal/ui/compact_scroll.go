@@ -45,7 +45,7 @@ func (m *Model) clampCompactScrollOffset() {
 		m.CompactScrollOffset = 0
 		return
 	}
-	m.CompactScrollOffset = m.clampedCompactScrollOffset(len(m.compactRows()), m.compactVisibleRowCapacity())
+	m.CompactScrollOffset = m.clampedCompactScrollOffset(len(m.compactVisualOrderIndices()), m.compactVisibleRowCapacity())
 }
 
 func (m *Model) scrollCompactRows(delta int) {
@@ -63,10 +63,10 @@ func (m *Model) ensureCompactActiveVisible() {
 		return
 	}
 
-	rows := m.compactRows()
+	order := m.compactVisualOrderIndices()
 	activeRow := -1
-	for i, row := range rows {
-		if row.accountIndex == m.ActiveAccountIx {
+	for i, accountIndex := range order {
+		if accountIndex == m.ActiveAccountIx {
 			activeRow = i
 			break
 		}
@@ -76,7 +76,7 @@ func (m *Model) ensureCompactActiveVisible() {
 		return
 	}
 
-	offset := m.clampedCompactScrollOffset(len(rows), capacity)
+	offset := m.clampedCompactScrollOffset(len(order), capacity)
 	if activeRow < offset {
 		offset = activeRow
 	} else if activeRow >= offset+capacity {

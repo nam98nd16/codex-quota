@@ -249,7 +249,19 @@ func (m Model) renderHelpModal() string {
 		renderHelpLine("q", "Quit"),
 		"",
 	}
-	return InfoBoxStyle.Copy().Width(56).Render(strings.Join(lines, "\n"))
+	width := 56
+	if m.CompactMode {
+		lines = append(lines,
+			HelpSectionStyle.Render("Compact navigation"),
+			renderHelpLine("PgUp/PgDn", "Page records; on Mac use Fn+↑/↓"),
+			renderHelpLine("Ctrl+U/D", "Page records without Page keys"),
+			renderHelpLine("Home/End", "Jump first/last; on Mac use Fn+←/→"),
+			renderHelpLine("Ctrl+A/E", "Jump first/last without Home/End keys"),
+			"",
+		)
+		width = 68
+	}
+	return InfoBoxStyle.Copy().Width(width).Render(strings.Join(lines, "\n"))
 }
 
 func (m Model) renderAddAccountLoginModal() string {

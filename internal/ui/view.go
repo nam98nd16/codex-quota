@@ -22,6 +22,7 @@ func (m Model) View() string {
 			s.WriteString(m.renderAccountTabs())
 			s.WriteString("\n\n")
 		} else {
+			s.WriteString(m.renderCompactRecordsStatus())
 			s.WriteString("\n")
 		}
 	}
@@ -106,7 +107,13 @@ func (m Model) renderHeader() string {
 
 func (m Model) renderFooter() string {
 	if m.CompactMode {
-		return "↑↓ Move/Scroll • Enter Menu • ? Help • q Quit"
+		if m.Width >= 118 {
+			return "↑↓ Move • Fn+↑↓/Ctrl+U/D Page • Fn+←→/Ctrl+A/E Jump • Enter Menu • ? Help • q Quit"
+		}
+		if m.Width >= 84 {
+			return "↑↓ Move • Ctrl+U/D Page • Ctrl+A/E Jump • Enter Menu • ? Help • q Quit"
+		}
+		return "↑↓ Move • Ctrl+U/D Page • Enter Menu • ? Help"
 	}
 	return "←→ Move • Enter Menu • ? Help • q Quit"
 }

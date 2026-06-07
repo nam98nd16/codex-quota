@@ -306,6 +306,42 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "o":
 			return m.beginApplyFlow()
 
+		case "pgdown", "ctrl+d", "alt+down":
+			if len(m.Accounts) > 1 && m.CompactMode && m.moveActiveAccountCompactPage(1) {
+				m.ensureCompactActiveVisible()
+				return m, m.syncAndFetchActiveAccount()
+			}
+			return m, nil
+
+		case "pgup", "ctrl+u", "alt+up":
+			if len(m.Accounts) > 1 && m.CompactMode && m.moveActiveAccountCompactPage(-1) {
+				m.ensureCompactActiveVisible()
+				return m, m.syncAndFetchActiveAccount()
+			}
+			return m, nil
+
+		case "home", "ctrl+a":
+			if len(m.Accounts) > 1 && m.CompactMode && m.jumpActiveAccountCompact(0) {
+				m.ensureCompactActiveVisible()
+				return m, m.syncAndFetchActiveAccount()
+			}
+			if len(m.Accounts) > 1 && !m.CompactMode && m.ActiveAccountIx != 0 {
+				m.ActiveAccountIx = 0
+				return m, m.syncAndFetchActiveAccount()
+			}
+			return m, nil
+
+		case "end", "ctrl+e":
+			if len(m.Accounts) > 1 && m.CompactMode && m.jumpActiveAccountCompact(len(m.compactVisualOrderIndices())-1) {
+				m.ensureCompactActiveVisible()
+				return m, m.syncAndFetchActiveAccount()
+			}
+			if len(m.Accounts) > 1 && !m.CompactMode && m.ActiveAccountIx != len(m.Accounts)-1 {
+				m.ActiveAccountIx = len(m.Accounts) - 1
+				return m, m.syncAndFetchActiveAccount()
+			}
+			return m, nil
+
 		case "right", "l", "down", "j":
 			if len(m.Accounts) > 1 {
 				if m.CompactMode {

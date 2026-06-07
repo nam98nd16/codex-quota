@@ -12,8 +12,9 @@ import (
 )
 
 type compactListRow struct {
-	line         string
-	accountIndex int
+	line           string
+	accountIndex   int
+	accountIndices []int
 }
 
 func (m Model) renderCompactView() string {
@@ -58,9 +59,19 @@ func (m Model) compactRows() []compactListRow {
 }
 
 func (m Model) compactAccountRows(rowIndexes []int, accountWidth int) []compactListRow {
-	limit := m.preferredContentWidth()
+	return m.compactAccountRowsForWidth(rowIndexes, accountWidth, m.preferredContentWidth())
+}
+
+func (m Model) compactAccountRowsForWidth(rowIndexes []int, accountWidth int, limit int) []compactListRow {
+	if limit <= 0 {
+		limit = m.preferredContentWidth()
+	}
 	if limit <= 0 && m.Width > 0 {
 		limit = m.Width
+	}
+	renderer := m
+	if limit > 0 {
+		renderer.Width = limit
 	}
 	rows := make([]compactListRow, 0, len(rowIndexes))
 	for _, i := range rowIndexes {
@@ -71,13 +82,13 @@ func (m Model) compactAccountRows(rowIndexes []int, accountWidth int) []compactL
 		if acc == nil {
 			continue
 		}
-		row := m.renderCompactAccountRow(i, acc, accountWidth)
+		row := renderer.renderCompactAccountRow(i, acc, accountWidth)
 		// Guard against style-induced line wraps on very narrow terminals.
 		row = strings.ReplaceAll(row, "\n", " ")
 		if limit > 0 && ansi.StringWidth(row) > limit {
 			row = ansi.Cut(row, 0, limit)
 		}
-		rows = append(rows, compactListRow{line: row, accountIndex: i})
+		rows = append(rows, compactListRow{line: row, accountIndex: i, accountIndices: []int{i}})
 	}
 	return rows
 }
@@ -163,7 +174,7 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 	s.WriteString(renderSmoothBar(barWidth, ratio, gradientStart, gradientEnd))
 	s.WriteString(" ")
 	s.WriteString(m.renderCompactPercent(fmt.Sprintf("%.0f%%", window.LeftPercent), subscribed, percentWidth))
-	reset := truncateLabelStrict(formatResetText(window.ResetAt), resetWidth)
+	reset := truncateLabelStrict(compactResetText(window.ResetAt), resetWidth)
 	if resetWidth > 0 && strings.TrimSpace(reset) != "" {
 		s.WriteString(ResetTimeStyle.Copy().Width(resetWidth).Render(reset))
 	}
@@ -215,7 +226,10 @@ func (m Model) renderCompactPercent(value string, subscribed bool, width int) st
 }
 
 func (m Model) compactAccountWidth() int {
-	width := m.Width
+	return m.compactAccountWidthForViewport(m.Width)
+}
+
+func (m Model) compactAccountWidthForViewport(width int) int {
 	if width <= 0 {
 		width = m.preferredContentWidth()
 	}
@@ -230,15 +244,17 @@ func (m Model) compactAccountWidth() int {
 		return 16
 	case width >= 72:
 		return 18
+	case width >= 60:
+		return 18
 	default:
-		return 12
+		return 14
 	}
 }
 
 func (m Model) compactRowLayout(leftWidth int) (barWidth, percentWidth, resetWidth int) {
 	barWidth = m.defaultBarWidth()
 	percentWidth = 5
-	resetWidth = 26
+	resetWidth = 14
 
 	available := m.preferredContentWidth() - leftWidth
 	if available <= 0 {

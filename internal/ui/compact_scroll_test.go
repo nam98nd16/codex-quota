@@ -37,11 +37,57 @@ func TestCompactViewClipsLargeListsAndKeepsFooter(t *testing.T) {
 	if height := lipgloss.Height(out); height > m.Height {
 		t.Fatalf("view height = %d, want <= %d\n%s", height, m.Height, out)
 	}
-	if !strings.Contains(out, "Move/Scroll") || !strings.Contains(out, "Enter Menu") {
+	if !strings.Contains(out, "Ctrl+U/D Page") || !strings.Contains(out, "Enter Menu") {
 		t.Fatalf("expected footer to remain visible, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Records 1-") || !strings.Contains(out, "/ 30") {
+		t.Fatalf("expected compact records status with total count, got:\n%s", out)
 	}
 	if strings.Contains(out, "user29@example.com") {
 		t.Fatalf("expected tail account to be clipped before scrolling, got:\n%s", out)
+	}
+}
+
+func TestCompactRecordsStatusUpdatesAfterScroll(t *testing.T) {
+	m := testCompactScrollModel(30, 140, 18)
+	m.scrollCompactRows(5)
+
+	out := ansi.Strip(m.View())
+	if !strings.Contains(out, "Records 6-") || !strings.Contains(out, "/ 30") {
+		t.Fatalf("expected scrolled compact records status with total count, got:\n%s", out)
+	}
+}
+
+func TestCompactRecordsStatusIncludesActiveAccountDetail(t *testing.T) {
+	m := testCompactScrollModel(30, 170, 18)
+
+	out := ansi.Strip(m.View())
+	for _, want := range []string{"Active user00@example.com", "Weekly 95%", "("} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected compact records status to contain %q, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestCompactRecordsStatusTracksActiveAccount(t *testing.T) {
+	m := testCompactScrollModel(30, 170, 18)
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlE})
+	got := updated.(Model)
+	out := ansi.Strip(got.View())
+	if !strings.Contains(out, "Active user29@example.com") {
+		t.Fatalf("expected compact records status to track active account, got:\n%s", out)
+	}
+}
+
+func TestCompactRecordsStatusStaysWithinNarrowWidth(t *testing.T) {
+	m := testCompactScrollModel(30, 84, 18)
+
+	out := ansi.Strip(m.View())
+	for _, line := range strings.Split(out, "\n") {
+		if width := ansi.StringWidth(line); width > m.Width {
+			t.Fatalf("line width = %d, want <= %d\n%s", width, m.Width, line)
+		}
 	}
 }
 
@@ -60,6 +106,51 @@ func TestCompactKeyboardNavigationKeepsActiveRowVisible(t *testing.T) {
 	}
 	if got.CompactScrollOffset == 0 {
 		t.Fatalf("expected compact scroll offset to advance")
+	}
+}
+
+func TestCompactPageNavigationSupportsMacFriendlyKeys(t *testing.T) {
+	m := testCompactScrollModel(30, 140, 18)
+	pageSize := m.compactVisibleRowCapacity()
+	if pageSize <= 0 {
+		t.Fatalf("expected positive compact page size")
+	}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
+	got := updated.(Model)
+	if got.ActiveAccountIx != pageSize {
+		t.Fatalf("ActiveAccountIx = %d after Ctrl+D, want %d", got.ActiveAccountIx, pageSize)
+	}
+	if got.CompactScrollOffset == 0 {
+		t.Fatalf("expected Ctrl+D to advance compact scroll offset")
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyCtrlU})
+	got = updated.(Model)
+	if got.ActiveAccountIx != 0 {
+		t.Fatalf("ActiveAccountIx = %d after Ctrl+U, want 0", got.ActiveAccountIx)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyDown, Alt: true})
+	got = updated.(Model)
+	if got.ActiveAccountIx != pageSize {
+		t.Fatalf("ActiveAccountIx = %d after Alt+Down, want %d", got.ActiveAccountIx, pageSize)
+	}
+}
+
+func TestCompactHomeEndSupportsMacFriendlyAliases(t *testing.T) {
+	m := testCompactScrollModel(30, 140, 18)
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlE})
+	got := updated.(Model)
+	if got.ActiveAccountIx != len(got.Accounts)-1 {
+		t.Fatalf("ActiveAccountIx = %d after Ctrl+E, want last account", got.ActiveAccountIx)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyCtrlA})
+	got = updated.(Model)
+	if got.ActiveAccountIx != 0 {
+		t.Fatalf("ActiveAccountIx = %d after Ctrl+A, want first account", got.ActiveAccountIx)
 	}
 }
 
@@ -86,7 +177,7 @@ func TestCompactWideViewUsesTwoColumns(t *testing.T) {
 }
 
 func TestCompactNarrowViewStaysSingleColumn(t *testing.T) {
-	m := testCompactScrollModel(40, 160, 18)
+	m := testCompactScrollModel(40, 140, 18)
 	columns, _, _ := m.compactColumnLayout()
 	if columns != 1 {
 		t.Fatalf("compact columns = %d, want 1", columns)

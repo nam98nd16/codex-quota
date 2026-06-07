@@ -73,6 +73,60 @@ func (m *Model) moveActiveAccountCompact(delta int) {
 	m.ActiveAccountIx = order[next]
 }
 
+func (m *Model) moveActiveAccountCompactPage(delta int) bool {
+	step := m.compactVisibleRowCapacity()
+	if step < 1 {
+		step = 1
+	}
+	return m.moveActiveAccountCompactClamped(delta * step)
+}
+
+func (m *Model) jumpActiveAccountCompact(position int) bool {
+	return m.moveActiveAccountCompactToPosition(position)
+}
+
+func (m *Model) moveActiveAccountCompactClamped(delta int) bool {
+	order := m.compactVisualOrderIndices()
+	if len(order) == 0 {
+		return false
+	}
+
+	pos := m.compactActivePosition(order)
+	if pos < 0 {
+		pos = 0
+	}
+	return m.moveActiveAccountCompactToPosition(pos + delta)
+}
+
+func (m *Model) moveActiveAccountCompactToPosition(position int) bool {
+	order := m.compactVisualOrderIndices()
+	if len(order) == 0 {
+		return false
+	}
+	if position < 0 {
+		position = 0
+	}
+	if position >= len(order) {
+		position = len(order) - 1
+	}
+
+	next := order[position]
+	if m.ActiveAccountIx == next {
+		return false
+	}
+	m.ActiveAccountIx = next
+	return true
+}
+
+func (m Model) compactActivePosition(order []int) int {
+	for i, idx := range order {
+		if idx == m.ActiveAccountIx {
+			return i
+		}
+	}
+	return -1
+}
+
 func (m *Model) syncActiveAccount() {
 	m.Loading = true
 	m.Err = nil
