@@ -7,7 +7,7 @@ import (
 	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/deLiseLINO/codex-quota/internal/config"
 )
@@ -464,40 +464,62 @@ func (m Model) compactRefreshingCount() int {
 }
 
 func (m Model) compactAccountIndexAtPoint(x, y int) int {
-	if !m.CompactMode || len(m.Accounts) == 0 || m.Width <= 0 || m.Height <= 0 {
-		return -1
-	}
-	rowY := y - 1 - lipgloss.Height(m.compactViewPrefix())
-	if rowY < 0 {
+	if !m.CompactMode || len(m.Accounts) == 0 || m.Width <= 0 || m.Height <= 0 || x < 0 || y < 0 {
 		return -1
 	}
 	viewportHeight := m.compactListViewportHeight()
-	if viewportHeight > 0 && rowY >= viewportHeight {
-		return -1
-	}
 	columns, columnWidth, gap := m.compactColumnLayout()
 	lines := m.compactRenderedLines(viewportHeight, columns, columnWidth, gap)
-	if rowY >= len(lines) {
+	row, rowStartX, ok := m.compactRenderedRowAtScreenLine(lines, y)
+	if !ok {
 		return -1
 	}
-	accounts := lines[rowY].accountIndices
+
+	accounts := row.accountIndices
 	if len(accounts) == 0 {
+		return -1
+	}
+	localX := x - rowStartX
+	if localX < 0 {
+		return -1
+	}
+	rowWidth := ansi.StringWidth(ansi.Strip(row.line))
+	if localX >= rowWidth {
 		return -1
 	}
 	if columns <= 1 {
 		return accounts[0]
 	}
 	cellWidth := compactColumnLineWidth(columnWidth)
-	localX := x - 2
-	if localX < 0 {
-		return -1
-	}
 	column := localX / (cellWidth + gap)
 	cellX := localX % (cellWidth + gap)
 	if column < 0 || column >= columns || column >= len(accounts) || cellX >= cellWidth {
 		return -1
 	}
 	return accounts[column]
+}
+
+func (m Model) compactRenderedRowAtScreenLine(rows []compactListRow, y int) (compactListRow, int, bool) {
+	viewLines := strings.Split(ansi.Strip(m.View()), "\n")
+	if y < 0 || y >= len(viewLines) {
+		return compactListRow{}, 0, false
+	}
+	screenLine := viewLines[y]
+	for _, row := range rows {
+		if len(row.accountIndices) == 0 {
+			continue
+		}
+		plainRow := strings.TrimRight(ansi.Strip(row.line), " ")
+		if strings.TrimSpace(plainRow) == "" {
+			continue
+		}
+		start := strings.Index(screenLine, plainRow)
+		if start < 0 {
+			continue
+		}
+		return row, ansi.StringWidth(screenLine[:start]), true
+	}
+	return compactListRow{}, 0, false
 }
 
 func (m *Model) selectCompactAccountAtPoint(x, y int) bool {

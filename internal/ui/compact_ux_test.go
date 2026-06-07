@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/deLiseLINO/codex-quota/internal/api"
@@ -94,13 +93,61 @@ func TestCompactMouseHitTestingSelectsRows(t *testing.T) {
 	m.CompactPinApplied = false
 	m.CompactSort = compactSortDefault
 
-	firstListY := 1 + lipgloss.Height(m.compactViewPrefix())
-	if got := m.compactAccountIndexAtPoint(2, firstListY+1); got != 1 {
+	x, y := compactScreenPointContaining(t, m, "beta@example")
+	if got := m.compactAccountIndexAtPoint(x, y); got != 1 {
 		t.Fatalf("mouse hit row 2 = %d, want beta index 1", got)
 	}
-	if !m.selectCompactAccountAtPoint(2, firstListY+1) || m.ActiveAccountIx != 1 {
+	if !m.selectCompactAccountAtPoint(x, y) || m.ActiveAccountIx != 1 {
 		t.Fatalf("expected mouse selection to activate beta, active=%d", m.ActiveAccountIx)
 	}
+}
+
+func TestCompactMouseHitTestingAccountsForCenteredTallLayout(t *testing.T) {
+	m := compactUXTestModel()
+	m.Width = 220
+	m.Height = 60
+	m.CompactPinApplied = false
+	m.CompactSort = compactSortDefault
+
+	x, y := compactScreenPointContaining(t, m, "beta@example")
+	if got := m.compactAccountIndexAtPoint(x, y); got != 1 {
+		t.Fatalf("centered mouse hit = %d, want beta index 1 at %d,%d", got, x, y)
+	}
+}
+
+func TestCompactMouseHitTestingSelectsWideColumns(t *testing.T) {
+	m := compactUXTestModel()
+	m.Width = 220
+	m.Height = 30
+	m.CompactPinApplied = false
+	m.CompactSort = compactSortDefault
+
+	x, y := compactScreenPointContaining(t, m, "gamma@example")
+	if got := m.compactAccountIndexAtPoint(x, y); got != 2 {
+		t.Fatalf("wide-column mouse hit = %d, want gamma index 2 at %d,%d", got, x, y)
+	}
+}
+
+func TestCompactMouseHitTestingIgnoresSectionHeaders(t *testing.T) {
+	m := compactUXTestModel()
+	m.Width = 180
+	m.Height = 30
+
+	x, y := compactScreenPointContaining(t, m, "Exhausted accounts")
+	if got := m.compactAccountIndexAtPoint(x, y); got != -1 {
+		t.Fatalf("section header mouse hit = %d, want no account", got)
+	}
+}
+
+func compactScreenPointContaining(t *testing.T, m Model, needle string) (int, int) {
+	t.Helper()
+	for y, line := range strings.Split(ansi.Strip(m.View()), "\n") {
+		if start := strings.Index(line, needle); start >= 0 {
+			return ansi.StringWidth(line[:start]), y
+		}
+	}
+	t.Fatalf("could not find %q in rendered view:\n%s", needle, ansi.Strip(m.View()))
+	return 0, 0
 }
 
 func compactUXTestModel() Model {
