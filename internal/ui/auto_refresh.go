@@ -100,6 +100,7 @@ func (m *Model) nextAutoRefreshCmd(now time.Time) tea.Cmd {
 	if m == nil {
 		return nil
 	}
+	m.pruneAppliedLowQuotaRefreshState()
 	if !m.Settings.AutoRefreshEnabled {
 		m.clearAutoRefreshPending()
 		m.autoRefreshScheduledAt = 0
@@ -142,6 +143,7 @@ func (m *Model) enqueueDueAutoRefreshes(now time.Time) bool {
 	if m == nil || !m.Settings.AutoRefreshEnabled {
 		return false
 	}
+	m.pruneAppliedLowQuotaRefreshState()
 	if m.AutoRefreshPending == nil {
 		m.AutoRefreshPending = make(map[string]bool)
 	}
@@ -208,6 +210,11 @@ func (m *Model) pruneAutoRefreshState() {
 	for key := range m.AutoRefreshPending {
 		if _, ok := valid[key]; !ok {
 			delete(m.AutoRefreshPending, key)
+		}
+	}
+	for key := range m.appliedLowQuotaRefresh {
+		if _, ok := valid[key]; !ok {
+			delete(m.appliedLowQuotaRefresh, key)
 		}
 	}
 	for key := range m.BackgroundLoadingMap {

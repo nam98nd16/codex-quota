@@ -126,7 +126,7 @@ func TestManualSmartSwitchShowsNoticeWhenNoReplacementExists(t *testing.T) {
 func TestSmartSwitchIntervalUsesPeakOnlySteppedThresholds(t *testing.T) {
 	m := testModelForHotkeys(1)
 	m.Settings = config.DefaultSettings()
-	m.Settings.AutoSwitchExhausted = true
+	m.Settings.AutoSwitchExhausted = false
 	m.LoadingMap = map[string]bool{}
 	m.BackgroundLoadingMap = map[string]bool{}
 	m.ErrorsMap = map[string]error{}
@@ -174,6 +174,35 @@ func TestSmartSwitchIntervalUsesPeakOnlySteppedThresholds(t *testing.T) {
 	interval, ok = m.smartSwitchInterval("managed:1", offPeakNow)
 	if ok || interval != 0 {
 		t.Fatalf("smartSwitchInterval() off-peak = %v, %v, want 0, false", interval, ok)
+	}
+}
+
+func TestAutoSwitchDisabledBackgroundRefreshDoesNotSwitchActiveAccount(t *testing.T) {
+	m := testModelForHotkeys(2)
+	m.Loading = false
+	m.ActiveAccountIx = 0
+	m.Settings = config.DefaultSettings()
+	m.Settings.AutoSwitchExhausted = false
+	m.LoadingMap = map[string]bool{}
+	m.ErrorsMap = map[string]error{}
+	m.BackgroundLoadingMap = map[string]bool{}
+	m.BackgroundErrorMap = map[string]bool{}
+	m.PlanTypeByAccount = map[string]string{"managed:2": "team"}
+	m.UsageData = map[string]api.UsageData{
+		"managed:2": usableWeeklyQuota(64),
+	}
+	markAppliedSources(&m, map[config.Source]string{config.SourceCodex: "managed:1", config.SourceOpenCode: "managed:1"})
+
+	updated, _ := m.Update(DataMsg{
+		AccountKey: "managed:1",
+		Data:       exhaustedFiveHourQuota(),
+		Background: true,
+		FetchedAt:  time.Now(),
+	})
+	got := updated.(Model)
+
+	if got.activeAccountKey() != "managed:1" {
+		t.Fatalf("active account = %q, want managed:1", got.activeAccountKey())
 	}
 }
 
@@ -286,6 +315,15 @@ func exhaustedFiveHourQuota() api.UsageData {
 		Windows: []api.QuotaWindow{
 			{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 67, ResetAt: time.Now().Add(24 * time.Hour)},
 			{Label: "5 hour usage limit", WindowSec: 18000, LeftPercent: 0, ResetAt: time.Now().Add(time.Hour)},
+		},
+	}
+}
+
+func lowFiveHourQuota(left float64) api.UsageData {
+	return api.UsageData{
+		Windows: []api.QuotaWindow{
+			{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 67, ResetAt: time.Now().Add(24 * time.Hour)},
+			{Label: "5 hour usage limit", WindowSec: 18000, LeftPercent: left, ResetAt: time.Now().Add(time.Hour)},
 		},
 	}
 }

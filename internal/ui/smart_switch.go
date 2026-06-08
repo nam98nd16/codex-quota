@@ -22,6 +22,12 @@ const (
 	smartSwitchMediumRefreshInterval   = time.Minute
 )
 
+type appliedLowQuotaRefreshState struct {
+	WindowSec   int64
+	LeftPercent float64
+	StableCount int
+}
+
 type replacementCandidateRank struct {
 	subscribed   bool
 	blockingErr  bool
@@ -61,9 +67,6 @@ func (m Model) beginSmartSwitchActive() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) smartSwitchInterval(accountKey string, now time.Time) (time.Duration, bool) {
-	if !m.Settings.AutoSwitchExhausted {
-		return 0, false
-	}
 	if strings.TrimSpace(accountKey) == "" || !m.isCurrentAppliedAccountKey(accountKey) {
 		return 0, false
 	}
@@ -83,7 +86,8 @@ func (m Model) smartSwitchInterval(accountKey string, now time.Time) (time.Durat
 	if !ok || window.LeftPercent > smartSwitchWarningThresholdPercent {
 		return 0, false
 	}
-	return smartSwitchRefreshInterval(baseInterval, window.LeftPercent), true
+	interval := smartSwitchRefreshInterval(baseInterval, window.LeftPercent)
+	return m.appliedLowQuotaBackoffInterval(accountKey, interval, baseInterval), true
 }
 
 func smartSwitchRefreshInterval(baseInterval time.Duration, leftPercent float64) time.Duration {
@@ -101,6 +105,58 @@ func smartSwitchRefreshInterval(baseInterval time.Duration, leftPercent float64)
 		return smartSwitchMediumRefreshInterval
 	}
 	return halfInterval
+}
+
+func (m Model) appliedLowQuotaBackoffInterval(accountKey string, interval, maxInterval time.Duration) time.Duration {
+	if interval <= 0 || maxInterval <= 0 || interval >= maxInterval {
+		return interval
+	}
+	state := m.appliedLowQuotaRefresh[accountKey]
+	for i := 0; i < state.StableCount; i++ {
+		interval *= 2
+		if interval >= maxInterval {
+			return maxInterval
+		}
+	}
+	return interval
+}
+
+func (m *Model) updateAppliedLowQuotaRefreshState(accountKey string, data api.UsageData) {
+	if m == nil {
+		return
+	}
+	accountKey = strings.TrimSpace(accountKey)
+	if accountKey == "" {
+		return
+	}
+	if m.appliedLowQuotaRefresh == nil {
+		m.appliedLowQuotaRefresh = make(map[string]appliedLowQuotaRefreshState)
+	}
+	window, ok := watchedAutoSwitchWindow(data)
+	if !ok || !m.isCurrentAppliedAccountKey(accountKey) || window.LeftPercent > smartSwitchWarningThresholdPercent {
+		delete(m.appliedLowQuotaRefresh, accountKey)
+		return
+	}
+
+	next := appliedLowQuotaRefreshState{WindowSec: window.WindowSec, LeftPercent: window.LeftPercent}
+	previous, hadPrevious := m.appliedLowQuotaRefresh[accountKey]
+	if hadPrevious && previous.WindowSec == window.WindowSec && samePercent(previous.LeftPercent, window.LeftPercent) {
+		next.StableCount = previous.StableCount + 1
+	}
+	m.appliedLowQuotaRefresh[accountKey] = next
+}
+
+func (m *Model) pruneAppliedLowQuotaRefreshState() {
+	if m == nil || len(m.appliedLowQuotaRefresh) == 0 {
+		return
+	}
+	for accountKey := range m.appliedLowQuotaRefresh {
+		data, hasData := m.UsageData[accountKey]
+		window, hasWindow := watchedAutoSwitchWindow(data)
+		if !hasData || !hasWindow || !m.isCurrentAppliedAccountKey(accountKey) || window.LeftPercent > smartSwitchWarningThresholdPercent {
+			delete(m.appliedLowQuotaRefresh, accountKey)
+		}
+	}
 }
 
 func watchedAutoSwitchWindow(data api.UsageData) (api.QuotaWindow, bool) {

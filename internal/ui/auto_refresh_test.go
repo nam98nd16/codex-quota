@@ -145,10 +145,10 @@ func TestActionMenuSettingsOpensSettingsOverlay(t *testing.T) {
 	}
 }
 
-func TestAutoRefreshDueAtUsesPeakSmartSwitchCadence(t *testing.T) {
+func TestAutoRefreshDueAtUsesPeakAppliedLowQuotaCadenceWithoutAutoSwitch(t *testing.T) {
 	model := testModelForHotkeys(1)
 	model.Settings = config.DefaultSettings()
-	model.Settings.AutoSwitchExhausted = true
+	model.Settings.AutoSwitchExhausted = false
 	model.LoadingMap = map[string]bool{}
 	model.BackgroundLoadingMap = map[string]bool{}
 	model.ErrorsMap = map[string]error{}
@@ -173,6 +173,99 @@ func TestAutoRefreshDueAtUsesPeakSmartSwitchCadence(t *testing.T) {
 	want := lastFetchAt.Add(30 * time.Second).Add(autoRefreshJitter("managed:1", 30*time.Second))
 	if !dueAt.Equal(want) {
 		t.Fatalf("autoRefreshDueAt() = %v, want %v", dueAt, want)
+	}
+}
+
+func TestAutoRefreshDueAtBacksOffWhenAppliedLowQuotaIsUnchanged(t *testing.T) {
+	model := testModelForHotkeys(1)
+	model.Settings = config.DefaultSettings()
+	model.Settings.AutoSwitchExhausted = false
+	model.LoadingMap = map[string]bool{}
+	model.BackgroundLoadingMap = map[string]bool{}
+	model.ErrorsMap = map[string]error{}
+	model.BackgroundErrorMap = map[string]bool{}
+	markAppliedSources(&model, map[config.Source]string{config.SourceCodex: "managed:1", config.SourceOpenCode: "managed:1"})
+
+	baseAt := time.Date(2026, 4, 10, 3, 0, 0, 0, time.UTC)
+	intervals := []time.Duration{30 * time.Second, time.Minute, 2 * time.Minute, 4 * time.Minute, 5 * time.Minute}
+	for index, wantInterval := range intervals {
+		fetchedAt := baseAt.Add(time.Duration(index) * time.Minute)
+		updated, _ := model.Update(DataMsg{AccountKey: "managed:1", Data: lowFiveHourQuota(5), FetchedAt: fetchedAt})
+		model = updated.(Model)
+
+		dueAt, ok := model.autoRefreshDueAt("managed:1", fetchedAt)
+		if !ok {
+			t.Fatalf("expected due time after unchanged refresh %d", index)
+		}
+		want := fetchedAt.Add(wantInterval).Add(autoRefreshJitter("managed:1", wantInterval))
+		if !dueAt.Equal(want) {
+			t.Fatalf("unchanged refresh %d dueAt = %v, want %v", index, dueAt, want)
+		}
+	}
+}
+
+func TestAutoRefreshDueAtResetsBackoffWhenAppliedLowQuotaChanges(t *testing.T) {
+	model := testModelForHotkeys(1)
+	model.Settings = config.DefaultSettings()
+	model.Settings.AutoSwitchExhausted = false
+	model.LoadingMap = map[string]bool{}
+	model.BackgroundLoadingMap = map[string]bool{}
+	model.ErrorsMap = map[string]error{}
+	model.BackgroundErrorMap = map[string]bool{}
+	markAppliedSources(&model, map[config.Source]string{config.SourceCodex: "managed:1", config.SourceOpenCode: "managed:1"})
+
+	firstAt := time.Date(2026, 4, 10, 3, 0, 0, 0, time.UTC)
+	updated, _ := model.Update(DataMsg{AccountKey: "managed:1", Data: lowFiveHourQuota(1), FetchedAt: firstAt})
+	model = updated.(Model)
+	secondAt := firstAt.Add(10 * time.Second)
+	updated, _ = model.Update(DataMsg{AccountKey: "managed:1", Data: lowFiveHourQuota(1), FetchedAt: secondAt})
+	model = updated.(Model)
+
+	dueAt, ok := model.autoRefreshDueAt("managed:1", secondAt)
+	if !ok {
+		t.Fatalf("expected backed-off due time")
+	}
+	wantInterval := 20 * time.Second
+	want := secondAt.Add(wantInterval).Add(autoRefreshJitter("managed:1", wantInterval))
+	if !dueAt.Equal(want) {
+		t.Fatalf("backed-off dueAt = %v, want %v", dueAt, want)
+	}
+
+	changedAt := firstAt.Add(30 * time.Second)
+	updated, _ = model.Update(DataMsg{AccountKey: "managed:1", Data: lowFiveHourQuota(2), FetchedAt: changedAt})
+	model = updated.(Model)
+	dueAt, ok = model.autoRefreshDueAt("managed:1", changedAt)
+	if !ok {
+		t.Fatalf("expected due time after changed quota")
+	}
+	wantInterval = 10 * time.Second
+	want = changedAt.Add(wantInterval).Add(autoRefreshJitter("managed:1", wantInterval))
+	if !dueAt.Equal(want) {
+		t.Fatalf("changed quota dueAt = %v, want %v", dueAt, want)
+	}
+}
+
+func TestAutoRefreshDueAtDoesNotUseLowQuotaCadenceForNonAppliedAccount(t *testing.T) {
+	model := testModelForHotkeys(2)
+	model.Settings = config.DefaultSettings()
+	model.Settings.AutoSwitchExhausted = false
+	model.LoadingMap = map[string]bool{}
+	model.BackgroundLoadingMap = map[string]bool{}
+	model.ErrorsMap = map[string]error{}
+	model.BackgroundErrorMap = map[string]bool{}
+	fetchedAt := time.Date(2026, 4, 10, 3, 0, 0, 0, time.UTC)
+	model.LastQuotaFetchAt = map[string]time.Time{"managed:2": fetchedAt}
+	model.UsageData = map[string]api.UsageData{"managed:2": lowFiveHourQuota(1)}
+	markAppliedSources(&model, map[config.Source]string{config.SourceCodex: "managed:1", config.SourceOpenCode: "managed:1"})
+
+	dueAt, ok := model.autoRefreshDueAt("managed:2", fetchedAt)
+	if !ok {
+		t.Fatalf("expected normal due time for non-applied account")
+	}
+	wantInterval := 5 * time.Minute
+	want := fetchedAt.Add(wantInterval).Add(autoRefreshJitter("managed:2", wantInterval))
+	if !dueAt.Equal(want) {
+		t.Fatalf("non-applied dueAt = %v, want %v", dueAt, want)
 	}
 }
 
