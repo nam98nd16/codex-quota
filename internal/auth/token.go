@@ -13,7 +13,9 @@ import (
 )
 
 const (
-	tokenURL = "https://auth.openai.com/oauth/token"
+	tokenURL               = "https://auth.openai.com/oauth/token"
+	RequiredRefreshWindow  = 5 * time.Minute
+	PreferredRefreshWindow = 24 * time.Hour
 )
 
 type refreshRequest struct {
@@ -29,6 +31,14 @@ type refreshResponse struct {
 }
 
 func IsExpired(account *config.Account) bool {
+	return expiresWithin(account, RequiredRefreshWindow)
+}
+
+func ShouldRefreshSoon(account *config.Account) bool {
+	return expiresWithin(account, PreferredRefreshWindow)
+}
+
+func expiresWithin(account *config.Account, window time.Duration) bool {
 	if account == nil {
 		return true
 	}
@@ -44,7 +54,7 @@ func IsExpired(account *config.Account) bool {
 		return false
 	}
 
-	return time.Now().After(account.ExpiresAt.Add(-5 * time.Minute))
+	return time.Now().After(account.ExpiresAt.Add(-window))
 }
 
 func RefreshToken(account *config.Account) error {

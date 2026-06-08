@@ -221,6 +221,13 @@ func DeleteAccountSourcesCmd(account *config.Account, sources []config.Source, a
 	}
 }
 
+var (
+	isTokenExpired         = auth.IsExpired
+	shouldRefreshTokenSoon = auth.ShouldRefreshSoon
+	refreshAccountToken    = auth.RefreshToken
+	callQuotaAPI           = api.CallAPI
+)
+
 func FetchDataCmd(account *config.Account, background bool) tea.Cmd {
 	accountSnapshot := cloneAccount(account)
 	if accountSnapshot == nil {
@@ -234,18 +241,20 @@ func FetchDataCmd(account *config.Account, background bool) tea.Cmd {
 		workingAccount := *accountSnapshot
 		reloadAccounts := false
 
-		if auth.IsExpired(&workingAccount) {
-			if err := auth.RefreshToken(&workingAccount); err != nil {
+		if isTokenExpired(&workingAccount) {
+			if err := refreshAccountToken(&workingAccount); err != nil {
 				return ErrMsg{AccountKey: accountKey, Err: fmt.Errorf("token refresh failed: %w", err), Background: background, FetchedAt: fetchedAt}
 			}
+		} else if shouldRefreshTokenSoon(&workingAccount) && strings.TrimSpace(workingAccount.RefreshToken) != "" {
+			_ = refreshAccountToken(&workingAccount)
 		}
 
-		data, err := api.CallAPI(workingAccount.AccessToken, workingAccount.AccountID)
+		data, err := callQuotaAPI(workingAccount.AccessToken, workingAccount.AccountID)
 		if err != nil && api.IsUnauthorized(err) && workingAccount.RefreshToken != "" {
-			if refreshErr := auth.RefreshToken(&workingAccount); refreshErr != nil {
+			if refreshErr := refreshAccountToken(&workingAccount); refreshErr != nil {
 				return ErrMsg{AccountKey: accountKey, Err: fmt.Errorf("token refresh failed: %w", refreshErr), Background: background, FetchedAt: fetchedAt}
 			}
-			data, err = api.CallAPI(workingAccount.AccessToken, workingAccount.AccountID)
+			data, err = callQuotaAPI(workingAccount.AccessToken, workingAccount.AccountID)
 		}
 
 		if err != nil {
