@@ -74,7 +74,7 @@ func (m Model) compactAccountRowsForWidth(rowIndexes []int, accountWidth int, li
 		if acc == nil {
 			continue
 		}
-		row := renderer.renderCompactAccountRow(i, acc, accountWidth, density)
+		row := renderer.renderCompactAccountRow(i, acc, accountWidth, density, limit)
 		// Guard against style-induced line wraps on very narrow terminals.
 		row = strings.ReplaceAll(row, "\n", " ")
 		if limit > 0 && ansi.StringWidth(row) > limit {
@@ -85,7 +85,7 @@ func (m Model) compactAccountRowsForWidth(rowIndexes []int, accountWidth int, li
 	return rows
 }
 
-func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWidth int, density compactRowDensity) string {
+func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWidth int, density compactRowDensity, rowWidth int) string {
 	var s strings.Builder
 	isActive := index == m.ActiveAccountIx
 	prefix := "  "
@@ -120,7 +120,7 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 	if refreshWidth > 0 {
 		leftWidth += refreshWidth + 1
 	}
-	barWidth, percentWidth, resetWidth := m.compactRowLayout(leftWidth, density)
+	barWidth, percentWidth, resetWidth := m.compactRowLayout(leftWidth, density, rowWidth)
 
 	s.WriteString(prefix)
 	if badgeWidth > 0 {
@@ -287,14 +287,35 @@ func (m Model) compactAccountWidthForViewport(width int) int {
 	case width >= 44:
 		return 12
 	case width >= 36:
-		return 8
+		return 10
 	default:
 		return 8
 	}
 }
 
-func (m Model) compactRowLayout(leftWidth int, density compactRowDensity) (barWidth, percentWidth, resetWidth int) {
-	contentWidth := m.preferredContentWidth()
+func (m Model) compactAccountWidthForColumn(width int, columns int) int {
+	if columns < 5 {
+		return m.compactAccountWidthForViewport(width)
+	}
+	switch {
+	case width >= 48:
+		return 16
+	case width >= 44:
+		return 14
+	case width >= 40:
+		return 12
+	case width >= 36:
+		return 10
+	default:
+		return 8
+	}
+}
+
+func (m Model) compactRowLayout(leftWidth int, density compactRowDensity, rowWidth int) (barWidth, percentWidth, resetWidth int) {
+	contentWidth := rowWidth
+	if contentWidth <= 0 {
+		contentWidth = m.preferredContentWidth()
+	}
 	switch density {
 	case compactRowDensityUltra:
 		barWidth = min(m.defaultBarWidth(), 6)
@@ -324,6 +345,13 @@ func (m Model) compactRowLayout(leftWidth int, density compactRowDensity) (barWi
 	)
 
 	used := barWidth + gapWidth + percentWidth + resetMarginLeft + resetWidth
+	if density == compactRowDensityUltra || density == compactRowDensityDense {
+		barBudget := available - gapWidth - percentWidth - resetMarginLeft - resetWidth
+		if barBudget > barWidth {
+			barWidth = min(barBudget, min(m.defaultBarWidth(), compactDenseBarMaxWidth(density)))
+			used = barWidth + gapWidth + percentWidth + resetMarginLeft + resetWidth
+		}
+	}
 	shortage := used - available
 	if shortage <= 0 {
 		return
@@ -342,6 +370,12 @@ func (m Model) compactRowLayout(leftWidth int, density compactRowDensity) (barWi
 		}
 		shortage -= can
 		return current - can
+	}
+
+	if density == compactRowDensityUltra {
+		resetWidth = reduce(resetWidth, minResetWidth)
+		barWidth = reduce(barWidth, minBarWidth)
+		return
 	}
 
 	barWidth = reduce(barWidth, minBarWidth)

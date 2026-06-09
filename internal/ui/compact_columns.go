@@ -33,7 +33,7 @@ func (m Model) compactRenderedLines(viewportHeight int, columns int, columnWidth
 	start := m.clampedCompactScrollOffset(len(m.compactVisualOrderIndices()), m.compactVisibleRowCapacity())
 	skip := start
 	lines := []compactListRow{}
-	sections := m.compactListSectionsForWidth(columnWidth)
+	sections := m.compactListSectionsForWidth(columnWidth, columns)
 	if len(sections) == 0 {
 		return []compactListRow{{line: ActionMenuHintStyle.Render("No matching accounts"), accountIndex: -1}}
 	}
@@ -82,9 +82,9 @@ func (m Model) compactRenderedLines(viewportHeight int, columns int, columnWidth
 	return lines
 }
 
-func (m Model) compactListSectionsForWidth(width int) []compactListSection {
-	lineWidth := compactColumnLineWidth(width)
-	accountWidth := m.compactAccountWidthForViewport(lineWidth)
+func (m Model) compactListSectionsForWidth(width int, columns int) []compactListSection {
+	lineWidth := compactColumnLineWidth(width, columns)
+	accountWidth := m.compactAccountWidthForColumn(lineWidth, columns)
 	sections := []compactListSection{}
 	for _, section := range m.compactIndexSections() {
 		header := ""
@@ -113,7 +113,7 @@ func renderCompactSectionGrid(rows []compactListRow, columns int, columnWidth in
 		return nil
 	}
 
-	columnLineWidth := compactColumnLineWidth(columnWidth)
+	columnLineWidth := compactColumnLineWidth(columnWidth, columns)
 	rowCount := (len(rows) + columns - 1) / columns
 	if maxLines > 0 && rowCount > maxLines {
 		rowCount = maxLines
@@ -197,9 +197,12 @@ func (m Model) compactContentWidth() int {
 	return contentWidth
 }
 
-func compactColumnLineWidth(columnWidth int) int {
+func compactColumnLineWidth(columnWidth int, columns int) int {
 	if columnWidth <= 12 {
 		return columnWidth
+	}
+	if columns >= 5 {
+		return columnWidth - 2
 	}
 	return columnWidth - 4
 }

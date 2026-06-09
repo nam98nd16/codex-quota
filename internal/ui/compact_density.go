@@ -28,6 +28,13 @@ func (density compactRowDensity) usesRelativeReset() bool {
 	return density >= compactRowDensityDense
 }
 
+func compactDenseBarMaxWidth(density compactRowDensity) int {
+	if density == compactRowDensityUltra {
+		return 14
+	}
+	return 16
+}
+
 func compactDenseResetText(resetAt time.Time) string {
 	if resetAt.IsZero() {
 		return "unknown"

@@ -528,7 +528,7 @@ func (m Model) compactAccountIndexAtPoint(x, y int) int {
 	if columns <= 1 {
 		return accounts[0]
 	}
-	cellWidth := compactColumnLineWidth(columnWidth)
+	cellWidth := compactColumnLineWidth(columnWidth, columns)
 	column := localX / (cellWidth + gap)
 	cellX := localX % (cellWidth + gap)
 	if column < 0 || column >= columns || column >= len(accounts) || cellX >= cellWidth {

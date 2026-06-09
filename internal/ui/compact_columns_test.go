@@ -137,6 +137,44 @@ func TestCompactFiveColumnRowsUseUltraDenseRelativeResetText(t *testing.T) {
 	}
 }
 
+func TestCompactFiveColumnLayoutUsesAvailableCellWidth(t *testing.T) {
+	narrowLineWidth, narrowAccountWidth, narrowBarWidth := compactFiveColumnCellMetrics(t, 210)
+	wideLineWidth, wideAccountWidth, wideBarWidth := compactFiveColumnCellMetrics(t, 230)
+
+	if narrowLineWidth < 37 {
+		t.Fatalf("narrow five-column line width = %d, want >= 37", narrowLineWidth)
+	}
+	if narrowAccountWidth < 10 {
+		t.Fatalf("narrow five-column account width = %d, want >= 10", narrowAccountWidth)
+	}
+	if narrowBarWidth < 14 {
+		t.Fatalf("narrow five-column bar width = %d, want >= 14", narrowBarWidth)
+	}
+	if wideLineWidth <= narrowLineWidth {
+		t.Fatalf("wide five-column line width = %d, want > narrow %d", wideLineWidth, narrowLineWidth)
+	}
+	if wideAccountWidth <= narrowAccountWidth {
+		t.Fatalf("wide five-column account width = %d, want > narrow %d", wideAccountWidth, narrowAccountWidth)
+	}
+	if wideBarWidth <= narrowBarWidth {
+		t.Fatalf("wide five-column bar width = %d, want > narrow %d", wideBarWidth, narrowBarWidth)
+	}
+}
+
+func compactFiveColumnCellMetrics(t *testing.T, terminalWidth int) (lineWidth int, accountWidth int, barWidth int) {
+	t.Helper()
+	m := testCompactScrollModel(80, terminalWidth, 24)
+	columns, columnWidth, _ := m.compactColumnLayout()
+	if columns != 5 {
+		t.Fatalf("width %d: columns = %d, want 5", terminalWidth, columns)
+	}
+	lineWidth = compactColumnLineWidth(columnWidth, columns)
+	accountWidth = m.compactAccountWidthForColumn(lineWidth, columns)
+	leftWidth := ansi.StringWidth("  ") + accountWidth + 1
+	barWidth, _, _ = m.compactRowLayout(leftWidth, compactAccountRowDensity(lineWidth), lineWidth)
+	return lineWidth, accountWidth, barWidth
+}
+
 func TestCompactActiveExhaustedAccountRemainsVisibleInMultiColumn(t *testing.T) {
 	m := testCompactScrollModel(24, 200, 24)
 	for i := 18; i < 24; i++ {
