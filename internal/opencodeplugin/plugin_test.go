@@ -63,3 +63,49 @@ func TestPluginClassifierAcceptsUsageLimit429WithoutAPIErrorName(t *testing.T) {
 		t.Fatalf("plugin classifier is missing 429 usage-limit detection")
 	}
 }
+
+func TestPluginClassifierAcceptsOpenCodeRetryUsageLimitEvents(t *testing.T) {
+	expected := []string{
+		`session.next.retried`,
+		`session.next.step.failed`,
+		`session.status`,
+		`usage limit has been reached`,
+		`STRONG_QUOTA_PHRASES.some`,
+	}
+	for _, value := range expected {
+		if !strings.Contains(pluginSource, value) {
+			t.Fatalf("plugin source missing %q", value)
+		}
+	}
+}
+
+func TestPluginWritesDiagnostics(t *testing.T) {
+	expected := []string{
+		`opencode-plugin-debug.log`,
+		`DEBUG_LOG_MAX_BYTES`,
+		`WATCHED_EVENT_TYPES`,
+		`plugin.initialized`,
+		`event.received`,
+		`signal.classified`,
+		`notify.finished`,
+		`notify.failed`,
+	}
+	for _, value := range expected {
+		if !strings.Contains(pluginSource, value) {
+			t.Fatalf("plugin source missing diagnostic marker %q", value)
+		}
+	}
+}
+
+func TestPluginReadsTopLevelRetryErrorFields(t *testing.T) {
+	expected := []string{
+		`error?.statusCode`,
+		`error?.message`,
+		`error?.responseBody`,
+	}
+	for _, value := range expected {
+		if !strings.Contains(pluginSource, value) {
+			t.Fatalf("plugin source missing top-level retry error field %q", value)
+		}
+	}
+}
