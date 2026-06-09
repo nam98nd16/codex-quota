@@ -3,9 +3,10 @@ package ui
 import "strings"
 
 const (
-	compactColumnGap              = 2
-	compactMaxColumns             = 4
-	compactMinColumnViewportWidth = 48
+	compactColumnGap               = 2
+	compactMaxColumns              = 5
+	compactFiveColumnTerminalWidth = 222
+	compactMinColumnViewportWidth  = 48
 )
 
 type compactListSection struct {
@@ -170,6 +171,9 @@ func (m Model) compactColumnLayout() (columns int, columnWidth int, gap int) {
 	}
 
 	columns = (contentWidth + compactColumnGap) / (compactMinColumnViewportWidth + compactColumnGap)
+	if m.Width >= compactFiveColumnTerminalWidth {
+		columns = compactMaxColumns
+	}
 	if columns < 1 {
 		columns = 1
 	}

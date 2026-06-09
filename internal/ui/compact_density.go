@@ -3,9 +3,29 @@ package ui
 import "time"
 
 const compactDenseRowViewportWidth = 48
+const compactUltraDenseRowViewportWidth = 40
 
-func compactDenseAccountRow(limit int) bool {
-	return limit > 0 && limit <= compactDenseRowViewportWidth
+type compactRowDensity int
+
+const (
+	compactRowDensityNormal compactRowDensity = iota
+	compactRowDensityDense
+	compactRowDensityUltra
+)
+
+func compactAccountRowDensity(limit int) compactRowDensity {
+	switch {
+	case limit > 0 && limit <= compactUltraDenseRowViewportWidth:
+		return compactRowDensityUltra
+	case limit > 0 && limit <= compactDenseRowViewportWidth:
+		return compactRowDensityDense
+	default:
+		return compactRowDensityNormal
+	}
+}
+
+func (density compactRowDensity) usesRelativeReset() bool {
+	return density >= compactRowDensityDense
 }
 
 func compactDenseResetText(resetAt time.Time) string {

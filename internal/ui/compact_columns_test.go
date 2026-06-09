@@ -17,6 +17,8 @@ func TestCompactColumnLayoutThresholds(t *testing.T) {
 		{width: 102, want: 2},
 		{width: 152, want: 3},
 		{width: 202, want: 4},
+		{width: 221, want: 4},
+		{width: 222, want: 5},
 	}
 
 	for _, tc := range cases {
@@ -87,6 +89,51 @@ func TestCompactFourColumnRowsUseDenseRelativeResetText(t *testing.T) {
 	}
 	if !foundAccountLine {
 		t.Fatalf("expected account rows in four-column output:\n%s", rendered)
+	}
+}
+
+func TestCompactFiveColumnRowsStayAlignedAndWithinWidth(t *testing.T) {
+	m := testCompactScrollModel(80, 222, 24)
+	rendered := ansi.Strip(m.renderCompactViewWithin(m.compactListViewportHeight()))
+	contentWidth := m.compactContentWidth()
+
+	foundFiveCellRow := false
+	for _, line := range strings.Split(rendered, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if width := ansi.StringWidth(line); width > contentWidth {
+			t.Fatalf("line width = %d, want <= %d\n%s", width, contentWidth, line)
+		}
+		count := strings.Count(line, "user")
+		if count > 5 {
+			t.Fatalf("rendered more than five account cells in one row: %q", line)
+		}
+		if count == 5 {
+			foundFiveCellRow = true
+		}
+	}
+	if !foundFiveCellRow {
+		t.Fatalf("expected a five-column account row:\n%s", rendered)
+	}
+}
+
+func TestCompactFiveColumnRowsUseUltraDenseRelativeResetText(t *testing.T) {
+	m := testCompactScrollModel(80, 222, 24)
+	rendered := ansi.Strip(m.renderCompactViewWithin(m.compactListViewportHeight()))
+
+	foundAccountLine := false
+	for _, line := range strings.Split(rendered, "\n") {
+		if !strings.Contains(line, "user") {
+			continue
+		}
+		foundAccountLine = true
+		if strings.Contains(line, "(") || strings.Contains(line, ":") || strings.Contains(line, "example") {
+			t.Fatalf("expected ultra-dense five-column cells, got %q\n%s", line, rendered)
+		}
+	}
+	if !foundAccountLine {
+		t.Fatalf("expected account rows in five-column output:\n%s", rendered)
 	}
 }
 
