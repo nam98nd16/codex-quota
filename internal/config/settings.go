@@ -12,17 +12,25 @@ type Settings struct {
 	CheckForUpdateOnStartup   bool   `json:"check_for_update_on_startup"`
 	AutoRefreshEnabled        bool   `json:"auto_refresh_enabled"`
 	AutoSwitchExhausted       bool   `json:"auto_switch_exhausted"`
+	AutoSwitchTrigger         string `json:"auto_switch_trigger"`
 	AutoRefreshPeakStart      string `json:"auto_refresh_peak_start"`
 	AutoRefreshPeakEnd        string `json:"auto_refresh_peak_end"`
 	AutoRefreshPeakMinutes    int    `json:"auto_refresh_peak_minutes"`
 	AutoRefreshOffPeakMinutes int    `json:"auto_refresh_off_peak_minutes"`
 }
 
+const (
+	AutoSwitchTriggerEventFallback = "event_fallback"
+	AutoSwitchTriggerEventOnly     = "event_only"
+	AutoSwitchTriggerLegacyOnly    = "legacy_only"
+)
+
 func DefaultSettings() Settings {
 	return NormalizeSettings(Settings{
 		CheckForUpdateOnStartup:   true,
 		AutoRefreshEnabled:        true,
 		AutoSwitchExhausted:       false,
+		AutoSwitchTrigger:         AutoSwitchTriggerEventFallback,
 		AutoRefreshPeakStart:      "08:30",
 		AutoRefreshPeakEnd:        "22:30",
 		AutoRefreshPeakMinutes:    5,
@@ -35,6 +43,7 @@ func NormalizeSettings(settings Settings) Settings {
 		CheckForUpdateOnStartup:   settings.CheckForUpdateOnStartup,
 		AutoRefreshEnabled:        settings.AutoRefreshEnabled,
 		AutoSwitchExhausted:       settings.AutoSwitchExhausted,
+		AutoSwitchTrigger:         normalizeAutoSwitchTrigger(settings.AutoSwitchTrigger),
 		AutoRefreshPeakStart:      normalizeClockValue(settings.AutoRefreshPeakStart, "08:30"),
 		AutoRefreshPeakEnd:        normalizeClockValue(settings.AutoRefreshPeakEnd, "22:30"),
 		AutoRefreshPeakMinutes:    normalizePositiveMinutes(settings.AutoRefreshPeakMinutes, 5),
@@ -67,6 +76,9 @@ func LoadSettings() (Settings, error) {
 	if enabled, ok := root["auto_switch_exhausted"].(bool); ok {
 		settings.AutoSwitchExhausted = enabled
 	}
+	if trigger, ok := root["auto_switch_trigger"].(string); ok {
+		settings.AutoSwitchTrigger = trigger
+	}
 	if start, ok := root["auto_refresh_peak_start"].(string); ok {
 		settings.AutoRefreshPeakStart = start
 	}
@@ -95,6 +107,7 @@ func SaveSettings(settings Settings) error {
 		"check_for_update_on_startup":   settings.CheckForUpdateOnStartup,
 		"auto_refresh_enabled":          settings.AutoRefreshEnabled,
 		"auto_switch_exhausted":         settings.AutoSwitchExhausted,
+		"auto_switch_trigger":           settings.AutoSwitchTrigger,
 		"auto_refresh_peak_start":       settings.AutoRefreshPeakStart,
 		"auto_refresh_peak_end":         settings.AutoRefreshPeakEnd,
 		"auto_refresh_peak_minutes":     settings.AutoRefreshPeakMinutes,
@@ -128,6 +141,19 @@ func normalizePositiveMinutes(value, fallback int) int {
 		return value
 	}
 	return fallback
+}
+
+func normalizeAutoSwitchTrigger(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", AutoSwitchTriggerEventFallback, "event+fallback", "event + fallback", "event-fallback":
+		return AutoSwitchTriggerEventFallback
+	case AutoSwitchTriggerEventOnly, "event-only", "event only":
+		return AutoSwitchTriggerEventOnly
+	case AutoSwitchTriggerLegacyOnly, "legacy-only", "legacy refresh only", "legacy":
+		return AutoSwitchTriggerLegacyOnly
+	default:
+		return AutoSwitchTriggerEventFallback
+	}
 }
 
 func parseClockMinutes(value string) (int, bool) {

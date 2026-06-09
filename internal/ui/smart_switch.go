@@ -15,6 +15,7 @@ import (
 const (
 	smartSwitchWarningThresholdPercent = 90.0
 	smartSwitchMinimumRefreshInterval  = 5 * time.Second
+	autoSwitchFallbackThresholdPercent = 3.0
 )
 
 type replacementCandidateRank struct {
@@ -221,7 +222,7 @@ func (m *Model) maybeAutoSwitchAfterRefresh(accountKey string) tea.Cmd {
 	}
 
 	manualCheck := m.PendingSmartSwitchManual && m.isPendingSmartSwitchKey(accountKey)
-	shouldCheck := manualCheck || (m.Settings.AutoSwitchExhausted && m.isCurrentAppliedAccountKey(accountKey))
+	shouldCheck := manualCheck || (m.autoSwitchFallbackEnabled() && m.isCurrentAppliedAccountKey(accountKey))
 	if !shouldCheck {
 		return nil
 	}
@@ -229,7 +230,7 @@ func (m *Model) maybeAutoSwitchAfterRefresh(accountKey string) tea.Cmd {
 		m.finishPendingSmartSwitchKey(accountKey)
 	}
 
-	if !m.isCompactAccountExhausted(accountKey) {
+	if !m.shouldSwitchAfterRefresh(accountKey, manualCheck) {
 		if manualCheck && !m.PendingSmartSwitchManual {
 			for key := range m.SmartSwitchBurstPending {
 				delete(m.SmartSwitchBurstPending, key)
@@ -241,15 +242,7 @@ func (m *Model) maybeAutoSwitchAfterRefresh(accountKey string) tea.Cmd {
 		return nil
 	}
 
-	excluded := m.currentAppliedAccountKeySet()
-	if excluded == nil {
-		excluded = map[string]bool{accountKey: true}
-	}
-	replacements := m.bestReplacementAccounts(excluded, 1)
-	var replacement *config.Account
-	if len(replacements) > 0 {
-		replacement = replacements[0]
-	}
+	replacement := m.autoSwitchReplacement(accountKey)
 	if replacement == nil {
 		if !manualCheck {
 			return nil
@@ -259,16 +252,89 @@ func (m *Model) maybeAutoSwitchAfterRefresh(accountKey string) tea.Cmd {
 		m.noticeSeq++
 		return scheduleNoticeClearCmd(m.noticeSeq)
 	}
-	m.resetSmartSwitchState()
+	return m.applyAutoSwitchReplacement(replacement)
+}
 
+func (m Model) autoSwitchEventsEnabled() bool {
+	if !m.Settings.AutoSwitchExhausted {
+		return false
+	}
+	return config.NormalizeSettings(m.Settings).AutoSwitchTrigger != config.AutoSwitchTriggerLegacyOnly
+}
+
+func (m Model) autoSwitchFallbackEnabled() bool {
+	if !m.Settings.AutoSwitchExhausted {
+		return false
+	}
+	return config.NormalizeSettings(m.Settings).AutoSwitchTrigger != config.AutoSwitchTriggerEventOnly
+}
+
+func (m Model) shouldSwitchAfterRefresh(accountKey string, manualCheck bool) bool {
+	if manualCheck {
+		return m.isCompactAccountExhausted(accountKey) || m.accountAtFallbackSwitchThreshold(accountKey)
+	}
+	if !m.autoSwitchFallbackEnabled() {
+		return false
+	}
+	return m.accountAtFallbackSwitchThreshold(accountKey)
+}
+
+func (m Model) accountAtFallbackSwitchThreshold(accountKey string) bool {
+	data, ok := m.UsageData[accountKey]
+	if !ok {
+		return false
+	}
+	if isConfirmedExhausted(data) {
+		return true
+	}
+	window, ok := watchedAutoSwitchWindow(data)
+	return ok && window.LeftPercent <= autoSwitchFallbackThresholdPercent
+}
+
+func (m Model) autoSwitchReplacement(excludeKey string) *config.Account {
+	excluded := m.currentAppliedAccountKeySet()
+	if excluded == nil {
+		excluded = map[string]bool{}
+	}
+	if strings.TrimSpace(excludeKey) != "" {
+		excluded[excludeKey] = true
+	}
+	replacements := m.bestReplacementAccounts(excluded, 1)
+	if len(replacements) == 0 {
+		return nil
+	}
+	return replacements[0]
+}
+
+func (m *Model) applyAutoSwitchReplacement(replacement *config.Account) tea.Cmd {
+	if replacement == nil {
+		return nil
+	}
+	m.resetSmartSwitchState()
 	if !m.selectActiveAccountByKey(replacement.Key) {
 		return nil
 	}
-
 	return tea.Batch(
 		m.syncAndFetchActiveAccount(),
 		ApplyToTargetsCmd(replacement, applyTargetsOrdered()),
 	)
+}
+
+func (m *Model) forceAutoSwitchAppliedOpenCodeAccount() tea.Cmd {
+	if m == nil || !m.autoSwitchEventsEnabled() {
+		return nil
+	}
+	accountKey := m.currentAppliedAccountKeyForSource(config.SourceOpenCode)
+	if strings.TrimSpace(accountKey) == "" {
+		return nil
+	}
+	replacement := m.autoSwitchReplacement(accountKey)
+	if replacement == nil {
+		return nil
+	}
+	m.Notice = "OpenCode reported quota exhausted; switching account"
+	m.noticeSeq++
+	return tea.Batch(m.applyAutoSwitchReplacement(replacement), scheduleNoticeClearCmd(m.noticeSeq))
 }
 
 func (m *Model) selectActiveAccountByKey(accountKey string) bool {

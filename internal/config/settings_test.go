@@ -23,6 +23,9 @@ func TestLoadSettingsMissingFileReturnsDefaults(t *testing.T) {
 	if settings.AutoSwitchExhausted {
 		t.Fatalf("AutoSwitchExhausted = true, want false")
 	}
+	if settings.AutoSwitchTrigger != AutoSwitchTriggerEventFallback {
+		t.Fatalf("AutoSwitchTrigger = %q, want %q", settings.AutoSwitchTrigger, AutoSwitchTriggerEventFallback)
+	}
 	if settings.AutoRefreshPeakStart != "08:30" || settings.AutoRefreshPeakEnd != "22:30" {
 		t.Fatalf("unexpected default peak range: %q-%q", settings.AutoRefreshPeakStart, settings.AutoRefreshPeakEnd)
 	}
@@ -39,6 +42,7 @@ func TestSaveAndLoadSettings(t *testing.T) {
 		CheckForUpdateOnStartup:   false,
 		AutoRefreshEnabled:        true,
 		AutoSwitchExhausted:       true,
+		AutoSwitchTrigger:         AutoSwitchTriggerEventOnly,
 		AutoRefreshPeakStart:      "09:00",
 		AutoRefreshPeakEnd:        "21:00",
 		AutoRefreshPeakMinutes:    10,
@@ -60,6 +64,9 @@ func TestSaveAndLoadSettings(t *testing.T) {
 	}
 	if loaded.AutoSwitchExhausted != initial.AutoSwitchExhausted {
 		t.Fatalf("AutoSwitchExhausted = %v, want %v", loaded.AutoSwitchExhausted, initial.AutoSwitchExhausted)
+	}
+	if loaded.AutoSwitchTrigger != initial.AutoSwitchTrigger {
+		t.Fatalf("AutoSwitchTrigger = %q, want %q", loaded.AutoSwitchTrigger, initial.AutoSwitchTrigger)
 	}
 	if loaded.AutoRefreshPeakStart != initial.AutoRefreshPeakStart || loaded.AutoRefreshPeakEnd != initial.AutoRefreshPeakEnd {
 		t.Fatalf("unexpected peak range after load: %q-%q", loaded.AutoRefreshPeakStart, loaded.AutoRefreshPeakEnd)
@@ -91,6 +98,27 @@ func TestLoadSettingsNormalizesInvalidAutoRefreshValues(t *testing.T) {
 	}
 	if loaded.AutoRefreshPeakMinutes != 5 || loaded.AutoRefreshOffPeakMinutes != 30 {
 		t.Fatalf("expected invalid minute values to normalize, got peak=%d offpeak=%d", loaded.AutoRefreshPeakMinutes, loaded.AutoRefreshOffPeakMinutes)
+	}
+}
+
+func TestLoadSettingsNormalizesInvalidAutoSwitchTrigger(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CQ_CONFIG_HOME", dir)
+
+	path := filepath.Join(dir, "codex-quota", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(path, []byte(`{"auto_switch_trigger":"bad"}`), 0o600); err != nil {
+		t.Fatalf("write settings json: %v", err)
+	}
+
+	loaded, err := LoadSettings()
+	if err != nil {
+		t.Fatalf("LoadSettings() error = %v", err)
+	}
+	if loaded.AutoSwitchTrigger != AutoSwitchTriggerEventFallback {
+		t.Fatalf("AutoSwitchTrigger = %q, want %q", loaded.AutoSwitchTrigger, AutoSwitchTriggerEventFallback)
 	}
 }
 

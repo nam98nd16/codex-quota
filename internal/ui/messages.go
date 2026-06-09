@@ -71,3 +71,14 @@ type AutoRefreshTickMsg struct {
 	Now             time.Time
 	ScheduledAtUnix int64
 }
+
+type OpenCodeQuotaSignalMsg struct {
+	SessionID    string
+	ProviderID   string
+	ModelID      string
+	ErrorName    string
+	StatusCode   int
+	Message      string
+	ResponseBody string
+	ReceivedAt   time.Time
+}

@@ -123,6 +123,35 @@ func TestManualSmartSwitchShowsNoticeWhenNoReplacementExists(t *testing.T) {
 	}
 }
 
+func TestManualSmartSwitchSwitchesAtThreePercent(t *testing.T) {
+	m := testModelForHotkeys(2)
+	m.Loading = false
+	m.ActiveAccountIx = 0
+	m.PendingSmartSwitchManual = true
+	m.PendingSmartSwitchKeys = map[string]bool{"managed:1": true}
+	m.LoadingMap = map[string]bool{}
+	m.ErrorsMap = map[string]error{}
+	m.BackgroundLoadingMap = map[string]bool{}
+	m.BackgroundErrorMap = map[string]bool{}
+	m.PlanTypeByAccount = map[string]string{"managed:2": "team"}
+	m.UsageData = map[string]api.UsageData{"managed:2": usableWeeklyQuota(64)}
+	markAppliedSources(&m, map[config.Source]string{config.SourceCodex: "managed:1", config.SourceOpenCode: "managed:1"})
+
+	updated, cmd := m.Update(DataMsg{
+		AccountKey: "managed:1",
+		Data:       lowFiveHourQuota(3),
+		FetchedAt:  time.Now(),
+	})
+	got := updated.(Model)
+
+	if got.activeAccountKey() != "managed:2" {
+		t.Fatalf("active account = %q, want managed:2", got.activeAccountKey())
+	}
+	if cmd == nil {
+		t.Fatalf("expected manual smart switch command at 3 percent")
+	}
+}
+
 func TestSmartSwitchIntervalUsesPeakOnlySteppedThresholds(t *testing.T) {
 	m := testModelForHotkeys(1)
 	m.Settings = config.DefaultSettings()
@@ -239,6 +268,94 @@ func TestAutoSwitchEnabledBackgroundRefreshSwitchesActiveAccount(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Fatalf("expected auto-switch background flow to produce follow-up commands")
+	}
+}
+
+func TestOpenCodeQuotaSignalForceSwitchesEvenWhenQuotaShowsTwoPercent(t *testing.T) {
+	m := testModelForHotkeys(2)
+	m.Loading = false
+	m.ActiveAccountIx = 0
+	m.Settings = config.DefaultSettings()
+	m.Settings.AutoSwitchExhausted = true
+	m.Settings.AutoSwitchTrigger = config.AutoSwitchTriggerEventFallback
+	m.LoadingMap = map[string]bool{}
+	m.ErrorsMap = map[string]error{}
+	m.BackgroundLoadingMap = map[string]bool{}
+	m.BackgroundErrorMap = map[string]bool{}
+	m.PlanTypeByAccount = map[string]string{"managed:2": "team"}
+	m.UsageData = map[string]api.UsageData{
+		"managed:1": lowFiveHourQuota(2),
+		"managed:2": usableWeeklyQuota(64),
+	}
+	markAppliedSources(&m, map[config.Source]string{config.SourceCodex: "managed:1", config.SourceOpenCode: "managed:1"})
+
+	updated, cmd := m.Update(OpenCodeQuotaSignalMsg{ProviderID: "openai", StatusCode: 429, Message: "quota exhausted"})
+	got := updated.(Model)
+
+	if got.activeAccountKey() != "managed:2" {
+		t.Fatalf("active account = %q, want managed:2", got.activeAccountKey())
+	}
+	if cmd == nil {
+		t.Fatalf("expected forced event switch command")
+	}
+}
+
+func TestAutoSwitchFallbackSwitchesAtThreePercent(t *testing.T) {
+	m := testModelForHotkeys(2)
+	m.Loading = false
+	m.ActiveAccountIx = 0
+	m.Settings = config.DefaultSettings()
+	m.Settings.AutoSwitchExhausted = true
+	m.Settings.AutoSwitchTrigger = config.AutoSwitchTriggerEventFallback
+	m.LoadingMap = map[string]bool{}
+	m.ErrorsMap = map[string]error{}
+	m.BackgroundLoadingMap = map[string]bool{}
+	m.BackgroundErrorMap = map[string]bool{}
+	m.PlanTypeByAccount = map[string]string{"managed:2": "team"}
+	m.UsageData = map[string]api.UsageData{"managed:2": usableWeeklyQuota(64)}
+	markAppliedSources(&m, map[config.Source]string{config.SourceCodex: "managed:1", config.SourceOpenCode: "managed:1"})
+
+	updated, cmd := m.Update(DataMsg{
+		AccountKey: "managed:1",
+		Data:       lowFiveHourQuota(3),
+		Background: true,
+		FetchedAt:  time.Now(),
+	})
+	got := updated.(Model)
+
+	if got.activeAccountKey() != "managed:2" {
+		t.Fatalf("active account = %q, want managed:2", got.activeAccountKey())
+	}
+	if cmd == nil {
+		t.Fatalf("expected fallback threshold switch command")
+	}
+}
+
+func TestAutoSwitchEventOnlyDoesNotUseThreePercentFallback(t *testing.T) {
+	m := testModelForHotkeys(2)
+	m.Loading = false
+	m.ActiveAccountIx = 0
+	m.Settings = config.DefaultSettings()
+	m.Settings.AutoSwitchExhausted = true
+	m.Settings.AutoSwitchTrigger = config.AutoSwitchTriggerEventOnly
+	m.LoadingMap = map[string]bool{}
+	m.ErrorsMap = map[string]error{}
+	m.BackgroundLoadingMap = map[string]bool{}
+	m.BackgroundErrorMap = map[string]bool{}
+	m.PlanTypeByAccount = map[string]string{"managed:2": "team"}
+	m.UsageData = map[string]api.UsageData{"managed:2": usableWeeklyQuota(64)}
+	markAppliedSources(&m, map[config.Source]string{config.SourceCodex: "managed:1", config.SourceOpenCode: "managed:1"})
+
+	updated, _ := m.Update(DataMsg{
+		AccountKey: "managed:1",
+		Data:       lowFiveHourQuota(3),
+		Background: true,
+		FetchedAt:  time.Now(),
+	})
+	got := updated.(Model)
+
+	if got.activeAccountKey() != "managed:1" {
+		t.Fatalf("active account = %q, want managed:1", got.activeAccountKey())
 	}
 }
 

@@ -11,6 +11,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/deLiseLINO/codex-quota/internal/config"
+	"github.com/deLiseLINO/codex-quota/internal/opencodehook"
+	"github.com/deLiseLINO/codex-quota/internal/opencodeplugin"
 	"github.com/deLiseLINO/codex-quota/internal/ui"
 	"github.com/deLiseLINO/codex-quota/internal/update"
 	"github.com/deLiseLINO/codex-quota/internal/version"
@@ -23,6 +25,9 @@ const (
 	commandHelp
 	commandVersion
 	commandUpgrade
+	commandOpenCodePluginInstall
+	commandOpenCodePluginStatus
+	commandOpenCodePluginUninstall
 )
 
 var (
@@ -54,6 +59,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	case commandUpgrade:
 		return runUpgradeCommand(stdout, stderr)
+	case commandOpenCodePluginInstall:
+		return runOpenCodePluginInstall(stdout, stderr)
+	case commandOpenCodePluginStatus:
+		return runOpenCodePluginStatus(stdout, stderr)
+	case commandOpenCodePluginUninstall:
+		return runOpenCodePluginUninstall(stdout, stderr)
 	default:
 		if err := runInteractiveFn(stdout, stderr); err != nil {
 			fmt.Fprintf(stderr, "error: %v\n", err)
@@ -84,6 +95,20 @@ func parseCommand(args []string) (command, error) {
 			return commandUpgrade, fmt.Errorf("upgrade does not accept additional arguments")
 		}
 		return commandUpgrade, nil
+	case "opencode-plugin":
+		if len(args) != 2 {
+			return commandHelp, fmt.Errorf("opencode-plugin requires one of: install, status, uninstall")
+		}
+		switch args[1] {
+		case "install":
+			return commandOpenCodePluginInstall, nil
+		case "status":
+			return commandOpenCodePluginStatus, nil
+		case "uninstall":
+			return commandOpenCodePluginUninstall, nil
+		default:
+			return commandHelp, fmt.Errorf("unknown opencode-plugin command: %s", args[1])
+		}
 	default:
 		return commandRunTUI, fmt.Errorf("unknown command or flag: %s", args[0])
 	}
@@ -96,12 +121,71 @@ Usage:
   cq --help
   cq --version
   cq upgrade
+  cq opencode-plugin install
+  cq opencode-plugin status
+  cq opencode-plugin uninstall
 
 Commands:
-  --help      Show this help text
-  --version   Print the current cq version
-  upgrade     Upgrade cq when the install method is known
+  --help                    Show this help text
+  --version                 Print the current cq version
+  upgrade                   Upgrade cq when the install method is known
+  opencode-plugin install   Install the global OpenCode quota event plugin
+  opencode-plugin status    Show OpenCode plugin and cq hook status
+  opencode-plugin uninstall Remove the global OpenCode quota event plugin
 `) + "\n"
+}
+
+func runOpenCodePluginInstall(stdout, stderr io.Writer) int {
+	path, err := opencodeplugin.Install()
+	if err != nil {
+		fmt.Fprintf(stderr, "error: failed to install OpenCode plugin: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "installed OpenCode plugin: %s\n", path)
+	fmt.Fprintln(stdout, "restart OpenCode for the plugin to load")
+	return 0
+}
+
+func runOpenCodePluginStatus(stdout, stderr io.Writer) int {
+	status, err := opencodeplugin.CheckStatus()
+	if err != nil {
+		fmt.Fprintf(stderr, "error: failed to inspect OpenCode plugin: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "plugin: %s\n", statusText(status.Installed))
+	fmt.Fprintf(stdout, "plugin path: %s\n", status.PluginPath)
+	fmt.Fprintf(stdout, "cq listener: %s\n", runningText(status.ListenerUp))
+	fmt.Fprintf(stdout, "listener state: %s\n", status.StatePath)
+	return 0
+}
+
+func runOpenCodePluginUninstall(stdout, stderr io.Writer) int {
+	path, removed, err := opencodeplugin.Uninstall()
+	if err != nil {
+		fmt.Fprintf(stderr, "error: failed to uninstall OpenCode plugin: %v\n", err)
+		return 1
+	}
+	if removed {
+		fmt.Fprintf(stdout, "removed OpenCode plugin: %s\n", path)
+		fmt.Fprintln(stdout, "restart OpenCode for the removal to take effect")
+		return 0
+	}
+	fmt.Fprintf(stdout, "OpenCode plugin is not installed: %s\n", path)
+	return 0
+}
+
+func statusText(value bool) string {
+	if value {
+		return "installed"
+	}
+	return "not installed"
+}
+
+func runningText(value bool) string {
+	if value {
+		return "running"
+	}
+	return "not running"
 }
 
 func runUpgradeCommand(stdout, stderr io.Writer) int {
@@ -184,6 +268,27 @@ func runInteractive(stdout, stderr io.Writer) error {
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)
+	hookListener, hookErr := opencodehook.Start(func(signal opencodehook.Signal) {
+		program.Send(ui.OpenCodeQuotaSignalMsg{
+			SessionID:    signal.SessionID,
+			ProviderID:   signal.ProviderID,
+			ModelID:      signal.ModelID,
+			ErrorName:    signal.ErrorName,
+			StatusCode:   signal.StatusCode,
+			Message:      signal.Message,
+			ResponseBody: signal.ResponseBody,
+			ReceivedAt:   signal.ReceivedAt,
+		})
+	})
+	if hookErr != nil {
+		fmt.Fprintf(stderr, "warning: failed to start OpenCode quota hook listener: %v\n", hookErr)
+	} else {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			_ = hookListener.Close(ctx)
+		}()
+	}
 	if settings.CheckForUpdateOnStartup && update.ShouldRefresh(updateState, time.Now()) {
 		startBackgroundRefresh(program, updateState, method, currentVersion, settings)
 	}

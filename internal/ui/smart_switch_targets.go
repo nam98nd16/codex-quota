@@ -38,6 +38,21 @@ func (m Model) currentAppliedAccountKeys() []string {
 	return keys
 }
 
+func (m Model) currentAppliedAccountKeyForSource(source config.Source) string {
+	if source != config.SourceCodex && source != config.SourceOpenCode {
+		return ""
+	}
+	for _, account := range m.Accounts {
+		if account == nil || strings.TrimSpace(account.Key) == "" {
+			continue
+		}
+		if m.activeTargetSourcesForAccount(account)[source] {
+			return account.Key
+		}
+	}
+	return ""
+}
+
 func (m Model) currentAppliedAccountKeySet() map[string]bool {
 	keys := m.currentAppliedAccountKeys()
 	if len(keys) == 0 {

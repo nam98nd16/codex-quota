@@ -78,3 +78,20 @@ Additional shortcuts:
 - `x` — delete active account
 - `u` — open update prompt when an update is available
 - `Esc` — close modal/info/error/notice (or quit if nothing is open)
+
+## OpenCode exhausted-event auto switch
+
+For the most reliable `Auto switch exhausted` behavior with OpenCode, install the global OpenCode plugin:
+
+```bash
+cq opencode-plugin install
+```
+
+Then restart OpenCode. When OpenCode reports that the applied account is exhausted, `cq` force-switches to the best replacement account. If the plugin is not installed or an event is missed, the default fallback still switches when the applied account has `<= 3%` quota.
+
+Useful commands:
+
+```bash
+cq opencode-plugin status
+cq opencode-plugin uninstall
+```

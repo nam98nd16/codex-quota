@@ -147,3 +147,7 @@ func codexQuotaConfigDir() (string, error) {
 
 	return dir, nil
 }
+
+func ConfigDir() (string, error) {
+	return codexQuotaConfigDir()
+}

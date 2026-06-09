@@ -678,6 +678,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.enqueueDueAutoRefreshes(msg.Now)
 		return m, tea.Batch(m.fetchNextCmd(), m.nextAutoRefreshCmd(msg.Now))
 
+	case OpenCodeQuotaSignalMsg:
+		return m, m.forceAutoSwitchAppliedOpenCodeAccount()
+
 	case progress.FrameMsg:
 		defaultModel, defaultCmd := m.defaultProgress.Update(msg)
 		m.defaultProgress = defaultModel.(progress.Model)

@@ -19,6 +19,7 @@ type settingsField int
 const (
 	settingsFieldAutoRefresh settingsField = iota
 	settingsFieldAutoSwitchExhausted
+	settingsFieldAutoSwitchTrigger
 	settingsFieldPeakStart
 	settingsFieldPeakEnd
 	settingsFieldPeakInterval
@@ -68,6 +69,8 @@ func (m *Model) adjustCurrentSettingsField(delta int, toggle bool) {
 		if toggle || delta != 0 {
 			draft.AutoSwitchExhausted = !draft.AutoSwitchExhausted
 		}
+	case settingsFieldAutoSwitchTrigger:
+		draft.AutoSwitchTrigger = stepAutoSwitchTrigger(draft.AutoSwitchTrigger, delta)
 	case settingsFieldPeakStart:
 		stepClockValue(&draft.AutoRefreshPeakStart, delta)
 	case settingsFieldPeakEnd:
@@ -127,6 +130,7 @@ func (m Model) renderSettingsModal() string {
 	}{
 		{label: "Auto refresh", value: onOffText(draft.AutoRefreshEnabled)},
 		{label: "Auto switch exhausted", value: onOffText(draft.AutoSwitchExhausted)},
+		{label: "Auto switch trigger", value: autoSwitchTriggerText(draft.AutoSwitchTrigger)},
 		{label: "Peak start", value: draft.AutoRefreshPeakStart},
 		{label: "Peak end", value: draft.AutoRefreshPeakEnd},
 		{label: "Peak interval", value: formatMinuteValue(draft.AutoRefreshPeakMinutes)},
@@ -159,7 +163,8 @@ func (m Model) renderSettingsModal() string {
 	}
 	lines = append(lines, "")
 	lines = append(lines, InfoValueStyle.Render("Peak window uses the peak interval; all other times use off-peak."))
-	lines = append(lines, InfoValueStyle.Render("Auto switch exhausted watches the active account and switches/applies when quota is spent."))
+	lines = append(lines, InfoValueStyle.Render("Event mode uses OpenCode exhausted events; fallback switches at <= 3% quota."))
+	lines = append(lines, InfoValueStyle.Render("Install plugin: cq opencode-plugin install, then restart OpenCode."))
 	lines = append(lines, ActionMenuHintStyle.Render("[↑/↓] Move   [←/→] Adjust   [space] Toggle   [enter] Save   [esc] Cancel"))
 
 	return InfoBoxStyle.Copy().Width(actionMenuModalWidth(lines) + 6).Render(strings.Join(lines, "\n"))
@@ -195,6 +200,38 @@ func stepMinuteOption(current, delta int) int {
 	}
 	index = (index + delta + len(autoRefreshMinuteOptions)) % len(autoRefreshMinuteOptions)
 	return autoRefreshMinuteOptions[index]
+}
+
+func stepAutoSwitchTrigger(current string, delta int) string {
+	options := []string{
+		config.AutoSwitchTriggerEventFallback,
+		config.AutoSwitchTriggerEventOnly,
+		config.AutoSwitchTriggerLegacyOnly,
+	}
+	current = config.NormalizeSettings(config.Settings{AutoSwitchTrigger: current}).AutoSwitchTrigger
+	index := 0
+	for i, option := range options {
+		if option == current {
+			index = i
+			break
+		}
+	}
+	if delta == 0 {
+		return options[index]
+	}
+	index = (index + delta + len(options)) % len(options)
+	return options[index]
+}
+
+func autoSwitchTriggerText(value string) string {
+	switch config.NormalizeSettings(config.Settings{AutoSwitchTrigger: value}).AutoSwitchTrigger {
+	case config.AutoSwitchTriggerEventOnly:
+		return "event only"
+	case config.AutoSwitchTriggerLegacyOnly:
+		return "legacy refresh"
+	default:
+		return "event + fallback"
+	}
 }
 
 func formatMinuteValue(minutes int) string {
