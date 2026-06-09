@@ -163,7 +163,8 @@ func (m Model) renderSettingsModal() string {
 	}
 	lines = append(lines, "")
 	lines = append(lines, InfoValueStyle.Render("Peak window uses the peak interval; all other times use off-peak."))
-	lines = append(lines, InfoValueStyle.Render("Event mode uses OpenCode exhausted events; fallback switches at <= 3% quota."))
+	lines = append(lines, InfoValueStyle.Render("With plugin installed, auto switch waits for OpenCode exhausted events."))
+	lines = append(lines, InfoValueStyle.Render("Without plugin, legacy fallback switches at <= 3%; manual smart switch still uses <= 3%."))
 	lines = append(lines, InfoValueStyle.Render("Install plugin: cq opencode-plugin install, then restart OpenCode."))
 	lines = append(lines, ActionMenuHintStyle.Render("[↑/↓] Move   [←/→] Adjust   [space] Toggle   [enter] Save   [esc] Cancel"))
 

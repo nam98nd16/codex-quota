@@ -75,6 +75,7 @@ type Model struct {
 	UpdatePromptMethod        update.Method
 	UpdatePromptCursor        int
 	UpdateAvailableHint       string
+	OpenCodePluginInstalled   bool
 	pendingUpdateMethod       update.Method
 	hasPendingUpdateMethod    bool
 	autoRefreshScheduledAt    int64

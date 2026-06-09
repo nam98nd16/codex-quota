@@ -266,7 +266,14 @@ func (m Model) autoSwitchFallbackEnabled() bool {
 	if !m.Settings.AutoSwitchExhausted {
 		return false
 	}
-	return config.NormalizeSettings(m.Settings).AutoSwitchTrigger != config.AutoSwitchTriggerEventOnly
+	trigger := config.NormalizeSettings(m.Settings).AutoSwitchTrigger
+	if trigger == config.AutoSwitchTriggerEventOnly {
+		return false
+	}
+	if trigger == config.AutoSwitchTriggerLegacyOnly {
+		return true
+	}
+	return !m.OpenCodePluginInstalled
 }
 
 func (m Model) shouldSwitchAfterRefresh(accountKey string, manualCheck bool) bool {

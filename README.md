@@ -87,7 +87,7 @@ For the most reliable `Auto switch exhausted` behavior with OpenCode, install th
 cq opencode-plugin install
 ```
 
-Then restart OpenCode. When OpenCode reports that the applied account is exhausted, `cq` force-switches to the best replacement account. If the plugin is not installed or an event is missed, the default fallback still switches when the applied account has `<= 3%` quota.
+Then restart OpenCode. When OpenCode reports that the applied account is exhausted, `cq` force-switches to the best replacement account. If the plugin is installed, automatic switching waits for the OpenCode exhausted event; if it is not installed, the default legacy fallback switches when the applied account has `<= 3%` quota. Manual smart switch still uses the `<= 3%` threshold.
 
 Useful commands:
 

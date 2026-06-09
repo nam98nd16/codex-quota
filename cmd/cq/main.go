@@ -262,6 +262,11 @@ func runInteractive(stdout, stderr io.Writer) error {
 	)
 	uiModel.Settings = settings
 	uiModel.SettingsDraft = settings
+	if pluginStatus, err := opencodeplugin.CheckStatus(); err == nil {
+		uiModel.OpenCodePluginInstalled = pluginStatus.Installed
+	} else {
+		fmt.Fprintf(stderr, "warning: failed to inspect OpenCode plugin: %v\n", err)
+	}
 
 	program := tea.NewProgram(
 		uiModel,
