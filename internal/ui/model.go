@@ -54,7 +54,6 @@ type Model struct {
 	ExhaustedSticky           map[string]bool
 	LastQuotaFetchAt          map[string]time.Time
 	AutoRefreshPending        map[string]bool
-	appliedLowQuotaRefresh    map[string]appliedLowQuotaRefreshState
 	Accounts                  []*config.Account
 	SourcesByAccountID        map[string][]string
 	ActiveSourcesByIdentity   map[string][]string
@@ -150,7 +149,6 @@ func InitialModelWithStartupUpdate(
 		ExhaustedSticky:         make(map[string]bool),
 		LastQuotaFetchAt:        make(map[string]time.Time),
 		AutoRefreshPending:      make(map[string]bool),
-		appliedLowQuotaRefresh:  make(map[string]appliedLowQuotaRefreshState),
 		PendingSmartSwitchKeys:  make(map[string]bool),
 		SmartSwitchBurstPending: make(map[string]bool),
 		compactBarAnimations:    make(map[string]compactBarAnimation),
@@ -473,7 +471,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.BackgroundErrorMap = make(map[string]bool)
 			m.LastQuotaFetchAt = make(map[string]time.Time)
 			m.AutoRefreshPending = make(map[string]bool)
-			m.appliedLowQuotaRefresh = make(map[string]appliedLowQuotaRefreshState)
 		}
 		if m.ExhaustedSticky == nil {
 			m.ExhaustedSticky = make(map[string]bool)
@@ -495,7 +492,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.UsageData[msg.AccountKey] = msg.Data
 			m.setKnownPlanType(msg.AccountKey, msg.Data.PlanType)
 			stickyChanged = m.setExhaustedStickyIfConfirmed(msg.AccountKey, msg.Data) || stickyChanged
-			m.updateAppliedLowQuotaRefreshState(msg.AccountKey, msg.Data)
 			m.LoadingMap[msg.AccountKey] = false
 			m.BackgroundLoadingMap[msg.AccountKey] = false
 			delete(m.BackgroundErrorMap, msg.AccountKey)

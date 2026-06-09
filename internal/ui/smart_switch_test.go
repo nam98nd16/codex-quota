@@ -139,11 +139,15 @@ func TestSmartSwitchIntervalUsesPeakOnlySteppedThresholds(t *testing.T) {
 		want        time.Duration
 		ok          bool
 	}{
-		{name: "above threshold", leftPercent: 30, want: 0, ok: false},
-		{name: "warning band", leftPercent: 20, want: 150 * time.Second, ok: true},
-		{name: "medium band", leftPercent: 12, want: time.Minute, ok: true},
-		{name: "fast band", leftPercent: 5, want: 30 * time.Second, ok: true},
-		{name: "urgent band", leftPercent: 1, want: 10 * time.Second, ok: true},
+		{name: "above threshold", leftPercent: 95, want: 0, ok: false},
+		{name: "ninety percent", leftPercent: 90, want: 270 * time.Second, ok: true},
+		{name: "eighty five percent", leftPercent: 85, want: 270 * time.Second, ok: true},
+		{name: "eighty percent", leftPercent: 80, want: 240 * time.Second, ok: true},
+		{name: "twenty five percent", leftPercent: 25, want: 90 * time.Second, ok: true},
+		{name: "ten percent", leftPercent: 10, want: 30 * time.Second, ok: true},
+		{name: "nine percent", leftPercent: 9, want: 27 * time.Second, ok: true},
+		{name: "one percent clamps minimum", leftPercent: 1, want: 5 * time.Second, ok: true},
+		{name: "zero percent clamps minimum", leftPercent: 0, want: 5 * time.Second, ok: true},
 	}
 
 	for _, tc := range tests {
@@ -166,8 +170,8 @@ func TestSmartSwitchIntervalUsesPeakOnlySteppedThresholds(t *testing.T) {
 
 	m.UsageData["managed:1"] = usableWeeklyQuota(5)
 	interval, ok := m.smartSwitchInterval("managed:1", peakNow)
-	if !ok || interval != 30*time.Second {
-		t.Fatalf("smartSwitchInterval() with weekly fallback = %v, %v, want 30s, true", interval, ok)
+	if !ok || interval != 15*time.Second {
+		t.Fatalf("smartSwitchInterval() with weekly fallback = %v, %v, want 15s, true", interval, ok)
 	}
 
 	offPeakNow := time.Date(2026, 4, 10, 18, 0, 0, 0, time.UTC)

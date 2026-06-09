@@ -170,13 +170,14 @@ func TestAutoRefreshDueAtUsesPeakAppliedLowQuotaCadenceWithoutAutoSwitch(t *test
 	if !ok {
 		t.Fatalf("expected auto-refresh due time")
 	}
-	want := lastFetchAt.Add(30 * time.Second).Add(autoRefreshJitter("managed:1", 30*time.Second))
+	wantInterval := 15 * time.Second
+	want := lastFetchAt.Add(wantInterval).Add(autoRefreshJitter("managed:1", wantInterval))
 	if !dueAt.Equal(want) {
 		t.Fatalf("autoRefreshDueAt() = %v, want %v", dueAt, want)
 	}
 }
 
-func TestAutoRefreshDueAtBacksOffWhenAppliedLowQuotaIsUnchanged(t *testing.T) {
+func TestAutoRefreshDueAtKeepsQuotaScaledIntervalWhenAppliedQuotaIsUnchanged(t *testing.T) {
 	model := testModelForHotkeys(1)
 	model.Settings = config.DefaultSettings()
 	model.Settings.AutoSwitchExhausted = false
@@ -187,8 +188,8 @@ func TestAutoRefreshDueAtBacksOffWhenAppliedLowQuotaIsUnchanged(t *testing.T) {
 	markAppliedSources(&model, map[config.Source]string{config.SourceCodex: "managed:1", config.SourceOpenCode: "managed:1"})
 
 	baseAt := time.Date(2026, 4, 10, 3, 0, 0, 0, time.UTC)
-	intervals := []time.Duration{30 * time.Second, time.Minute, 2 * time.Minute, 4 * time.Minute, 5 * time.Minute}
-	for index, wantInterval := range intervals {
+	wantInterval := 15 * time.Second
+	for index := 0; index < 5; index++ {
 		fetchedAt := baseAt.Add(time.Duration(index) * time.Minute)
 		updated, _ := model.Update(DataMsg{AccountKey: "managed:1", Data: lowFiveHourQuota(5), FetchedAt: fetchedAt})
 		model = updated.(Model)
@@ -204,7 +205,7 @@ func TestAutoRefreshDueAtBacksOffWhenAppliedLowQuotaIsUnchanged(t *testing.T) {
 	}
 }
 
-func TestAutoRefreshDueAtResetsBackoffWhenAppliedLowQuotaChanges(t *testing.T) {
+func TestAutoRefreshDueAtTracksChangedAppliedQuotaPercent(t *testing.T) {
 	model := testModelForHotkeys(1)
 	model.Settings = config.DefaultSettings()
 	model.Settings.AutoSwitchExhausted = false
@@ -223,12 +224,12 @@ func TestAutoRefreshDueAtResetsBackoffWhenAppliedLowQuotaChanges(t *testing.T) {
 
 	dueAt, ok := model.autoRefreshDueAt("managed:1", secondAt)
 	if !ok {
-		t.Fatalf("expected backed-off due time")
+		t.Fatalf("expected due time after unchanged quota")
 	}
-	wantInterval := 20 * time.Second
+	wantInterval := 5 * time.Second
 	want := secondAt.Add(wantInterval).Add(autoRefreshJitter("managed:1", wantInterval))
 	if !dueAt.Equal(want) {
-		t.Fatalf("backed-off dueAt = %v, want %v", dueAt, want)
+		t.Fatalf("unchanged quota dueAt = %v, want %v", dueAt, want)
 	}
 
 	changedAt := firstAt.Add(30 * time.Second)
@@ -238,7 +239,7 @@ func TestAutoRefreshDueAtResetsBackoffWhenAppliedLowQuotaChanges(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected due time after changed quota")
 	}
-	wantInterval = 10 * time.Second
+	wantInterval = 6 * time.Second
 	want = changedAt.Add(wantInterval).Add(autoRefreshJitter("managed:1", wantInterval))
 	if !dueAt.Equal(want) {
 		t.Fatalf("changed quota dueAt = %v, want %v", dueAt, want)
