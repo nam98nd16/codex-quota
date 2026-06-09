@@ -155,7 +155,7 @@ func TestCompactHomeEndSupportsMacFriendlyAliases(t *testing.T) {
 }
 
 func TestCompactWideViewUsesTwoColumns(t *testing.T) {
-	m := testCompactScrollModel(40, 170, 18)
+	m := testCompactScrollModel(40, 150, 18)
 	columns, _, _ := m.compactColumnLayout()
 	if columns != 2 {
 		t.Fatalf("compact columns = %d, want 2", columns)
@@ -177,7 +177,7 @@ func TestCompactWideViewUsesTwoColumns(t *testing.T) {
 }
 
 func TestCompactNarrowViewStaysSingleColumn(t *testing.T) {
-	m := testCompactScrollModel(40, 120, 18)
+	m := testCompactScrollModel(40, 100, 18)
 	columns, _, _ := m.compactColumnLayout()
 	if columns != 1 {
 		t.Fatalf("compact columns = %d, want 1", columns)
@@ -191,7 +191,7 @@ func TestCompactNarrowViewStaysSingleColumn(t *testing.T) {
 }
 
 func TestCompactWideKeyboardNavigationKeepsSecondColumnActiveVisible(t *testing.T) {
-	m := testCompactScrollModel(40, 170, 18)
+	m := testCompactScrollModel(40, 150, 18)
 	viewportHeight := m.compactListViewportHeight()
 	steps := viewportHeight + 1
 
@@ -202,7 +202,7 @@ func TestCompactWideKeyboardNavigationKeepsSecondColumnActiveVisible(t *testing.
 	got := updated.(Model)
 
 	out := ansi.Strip(got.View())
-	activeLabel := fmt.Sprintf("● user%02d@example", steps)
+	activeLabel := fmt.Sprintf("● user%02d@", steps)
 	if !strings.Contains(out, activeLabel) {
 		t.Fatalf("expected second-column active account %q to be visible, got:\n%s", activeLabel, out)
 	}
@@ -212,7 +212,7 @@ func TestCompactWideKeyboardNavigationKeepsSecondColumnActiveVisible(t *testing.
 }
 
 func TestCompactWideScrollClampsToTwoColumnCapacity(t *testing.T) {
-	m := testCompactScrollModel(40, 170, 18)
+	m := testCompactScrollModel(40, 150, 18)
 	capacity := m.compactVisibleRowCapacity()
 	want := len(m.compactRows()) - capacity
 	if want < 0 {
@@ -226,7 +226,7 @@ func TestCompactWideScrollClampsToTwoColumnCapacity(t *testing.T) {
 }
 
 func TestCompactWideViewBalancesShortTwoColumnPage(t *testing.T) {
-	m := testCompactScrollModel(14, 170, 18)
+	m := testCompactScrollModel(14, 150, 18)
 	viewportHeight := m.compactListViewportHeight()
 	if viewportHeight >= len(m.compactRows()) {
 		t.Fatalf("test requires more rows than viewport height")

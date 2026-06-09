@@ -8,17 +8,23 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-func TestCompactColumnLayoutSupportsThreeAndFourColumns(t *testing.T) {
-	m := testCompactScrollModel(80, 200, 24)
-	columns, _, _ := m.compactColumnLayout()
-	if columns != 3 {
-		t.Fatalf("compact columns = %d, want 3", columns)
+func TestCompactColumnLayoutThresholds(t *testing.T) {
+	cases := []struct {
+		width int
+		want  int
+	}{
+		{width: 101, want: 1},
+		{width: 102, want: 2},
+		{width: 152, want: 3},
+		{width: 202, want: 4},
 	}
 
-	m.Width = 266
-	columns, _, _ = m.compactColumnLayout()
-	if columns != 4 {
-		t.Fatalf("compact columns = %d, want 4", columns)
+	for _, tc := range cases {
+		m := testCompactScrollModel(80, tc.width, 24)
+		columns, _, _ := m.compactColumnLayout()
+		if columns != tc.want {
+			t.Fatalf("width %d: compact columns = %d, want %d", tc.width, columns, tc.want)
+		}
 	}
 }
 
@@ -48,7 +54,7 @@ func TestCompactExhaustedHeaderSpansFullWidthInMultiColumn(t *testing.T) {
 }
 
 func TestCompactFourColumnRowsStayAlignedAndWithinWidth(t *testing.T) {
-	m := testCompactScrollModel(80, 266, 24)
+	m := testCompactScrollModel(80, 202, 24)
 	rendered := ansi.Strip(m.renderCompactViewWithin(m.compactListViewportHeight()))
 	contentWidth := m.compactContentWidth()
 
@@ -62,6 +68,25 @@ func TestCompactFourColumnRowsStayAlignedAndWithinWidth(t *testing.T) {
 		if count := strings.Count(line, "user"); count > 4 {
 			t.Fatalf("rendered more than four account cells in one row: %q", line)
 		}
+	}
+}
+
+func TestCompactFourColumnRowsUseDenseRelativeResetText(t *testing.T) {
+	m := testCompactScrollModel(80, 202, 24)
+	rendered := ansi.Strip(m.renderCompactViewWithin(m.compactListViewportHeight()))
+
+	foundAccountLine := false
+	for _, line := range strings.Split(rendered, "\n") {
+		if !strings.Contains(line, "user") {
+			continue
+		}
+		foundAccountLine = true
+		if strings.Contains(line, "(") || strings.Contains(line, ":") {
+			t.Fatalf("expected dense four-column reset text to be relative-only, got %q\n%s", line, rendered)
+		}
+	}
+	if !foundAccountLine {
+		t.Fatalf("expected account rows in four-column output:\n%s", rendered)
 	}
 }
 

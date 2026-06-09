@@ -624,7 +624,7 @@ func TestRenderCompactView_LoadingAndQueuedShareRowGeometry(t *testing.T) {
 		},
 	})
 	model.CompactMode = true
-	model.Width = 128
+	model.Width = 100
 	model.Accounts = []*config.Account{
 		{Key: "a1", Label: "first@example.com", Email: "first@example.com", AccountID: "id-1", Source: config.SourceManaged, Writable: true},
 		{Key: "a2", Label: "second@example.com", Email: "second@example.com", AccountID: "id-2", Source: config.SourceManaged, Writable: true},
@@ -1113,8 +1113,8 @@ func TestRenderCompactView_GroupsExhaustedAccountsAtBottom(t *testing.T) {
 		t.Fatalf("expected exhausted section header, got:\n%s", out)
 	}
 
-	normalIx := strings.Index(out, "normal-1@example.com")
-	exhaustedIx := strings.Index(out, "exhausted@example.com")
+	normalIx := strings.Index(out, "normal-1@")
+	exhaustedIx := strings.Index(out, "exhausted@")
 	if normalIx < 0 || exhaustedIx < 0 {
 		t.Fatalf("expected both normal and exhausted labels in output, got:\n%s", out)
 	}
@@ -1143,7 +1143,7 @@ func TestRenderCompactView_TreatsLimitReachedAsExhausted(t *testing.T) {
 
 	out := ansi.Strip(model.renderCompactView())
 	headerIx := strings.Index(out, "Exhausted accounts")
-	limitReachedIx := strings.Index(out, "limit-reached@example")
+	limitReachedIx := strings.Index(out, "limit-reac")
 	if headerIx < 0 || limitReachedIx < 0 {
 		t.Fatalf("expected exhausted header and account in output, got:\n%s", out)
 	}
@@ -1170,7 +1170,7 @@ func TestRenderCompactView_LoadingAccountStaysInMainSection(t *testing.T) {
 
 	out := ansi.Strip(model.renderCompactView())
 	headerIx := strings.Index(out, "Exhausted accounts")
-	loadingIx := strings.Index(out, "loading@example.com")
+	loadingIx := strings.Index(out, "loading@")
 	if headerIx < 0 || loadingIx < 0 {
 		t.Fatalf("expected header and loading account in output, got:\n%s", out)
 	}
@@ -1196,7 +1196,7 @@ func TestRenderCompactView_ActiveAccountHighlightWorksInExhaustedSection(t *test
 	}
 
 	out := ansi.Strip(model.renderCompactView())
-	if !strings.Contains(out, "● exhausted@example.com") {
+	if !strings.Contains(out, "● exhausted@") {
 		t.Fatalf("expected active marker in exhausted section, got:\n%s", out)
 	}
 }

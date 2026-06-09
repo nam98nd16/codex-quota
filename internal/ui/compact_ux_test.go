@@ -137,7 +137,7 @@ func TestCompactMouseHitTestingSelectsRows(t *testing.T) {
 	m.CompactPinApplied = false
 	m.CompactSort = compactSortOriginal
 
-	x, y := compactScreenPointContaining(t, m, "beta@example")
+	x, y := compactScreenPointContaining(t, m, "beta@")
 	if got := m.compactAccountIndexAtPoint(x, y); got != 1 {
 		t.Fatalf("mouse hit row 2 = %d, want beta index 1", got)
 	}
@@ -153,7 +153,7 @@ func TestCompactMouseHitTestingAccountsForCenteredTallLayout(t *testing.T) {
 	m.CompactPinApplied = false
 	m.CompactSort = compactSortOriginal
 
-	x, y := compactScreenPointContaining(t, m, "beta@example")
+	x, y := compactScreenPointContaining(t, m, "beta@")
 	if got := m.compactAccountIndexAtPoint(x, y); got != 1 {
 		t.Fatalf("centered mouse hit = %d, want beta index 1 at %d,%d", got, x, y)
 	}
@@ -166,7 +166,7 @@ func TestCompactMouseHitTestingSelectsWideColumns(t *testing.T) {
 	m.CompactPinApplied = false
 	m.CompactSort = compactSortOriginal
 
-	x, y := compactScreenPointContaining(t, m, "gamma@example")
+	x, y := compactScreenPointContaining(t, m, "gamma@")
 	if got := m.compactAccountIndexAtPoint(x, y); got != 2 {
 		t.Fatalf("wide-column mouse hit = %d, want gamma index 2 at %d,%d", got, x, y)
 	}

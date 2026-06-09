@@ -5,7 +5,7 @@ import "strings"
 const (
 	compactColumnGap              = 2
 	compactMaxColumns             = 4
-	compactMinColumnViewportWidth = 64
+	compactMinColumnViewportWidth = 48
 )
 
 type compactListSection struct {
