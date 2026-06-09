@@ -174,7 +174,7 @@ function isQuotaSignal(signal) {
   const provider = (signal.provider_id || "").toLowerCase()
   if (provider && provider !== "openai" && provider !== "opencode") return false
   const haystack = (signal.message + "\n" + signal.response_body).toLowerCase()
-  if (signal.error_name === "APIError" && signal.status_code === 429) return QUOTA_TERMS.some((term) => haystack.includes(term))
+  if (signal.status_code === 429) return QUOTA_TERMS.some((term) => haystack.includes(term))
   return haystack.includes("exhausted") && haystack.includes("quota")
 }
 

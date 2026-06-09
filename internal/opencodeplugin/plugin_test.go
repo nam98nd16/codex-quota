@@ -54,3 +54,12 @@ func TestInstallStatusAndUninstall(t *testing.T) {
 		t.Fatalf("plugin file still exists after uninstall: %v", err)
 	}
 }
+
+func TestPluginClassifierAcceptsUsageLimit429WithoutAPIErrorName(t *testing.T) {
+	if strings.Contains(pluginSource, `signal.error_name === "APIError" && signal.status_code === 429`) {
+		t.Fatalf("plugin classifier still requires APIError name for 429 quota signals")
+	}
+	if !strings.Contains(pluginSource, `signal.status_code === 429`) || !strings.Contains(pluginSource, `"usage limit"`) {
+		t.Fatalf("plugin classifier is missing 429 usage-limit detection")
+	}
+}
