@@ -183,6 +183,50 @@ func TestActiveSourceBadgesDisplayWidth_IncludesBrackets(t *testing.T) {
 	}
 }
 
+func TestRenderCompactView_UltraDenseAppliedRowsUseColorOnly(t *testing.T) {
+	account := &config.Account{
+		Key:       "acc-4",
+		Label:     "alpha@example.com",
+		Email:     "alpha@example.com",
+		AccountID: "acc-4",
+		Source:    config.SourceManaged,
+		Writable:  true,
+	}
+	m := InitialModel([]*config.Account{account}, map[string][]string{}, map[string][]string{
+		"email-account:alpha@example.com|acc-4": []string{"codex", "opencode"},
+	}, true)
+	m.Loading = false
+	m.Width = 210
+	m.Height = 20
+	m.UsageData = map[string]api.UsageData{
+		"acc-4": {
+			Windows: []api.QuotaWindow{{
+				Label:       "Weekly usage limit",
+				WindowSec:   604800,
+				LeftPercent: 95,
+				ResetAt:     time.Now().Add(time.Hour),
+			}},
+		},
+	}
+	m.LoadingMap = map[string]bool{}
+	m.ErrorsMap = map[string]error{}
+
+	out := ansi.Strip(m.renderCompactView())
+	for _, disallowed := range []string{"[C", "[O", "C•O", "]"} {
+		if strings.Contains(out, disallowed) {
+			t.Fatalf("expected ultra-dense applied row to omit inline badges %q:\n%s", disallowed, out)
+		}
+	}
+	if !strings.Contains(out, "alpha") {
+		t.Fatalf("expected applied account label in output:\n%s", out)
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if width := ansi.StringWidth(line); width > m.compactContentWidth() {
+			t.Fatalf("line width = %d, want <= %d\n%s", width, m.compactContentWidth(), line)
+		}
+	}
+}
+
 func TestActiveSourceBadgesForAccount_DoesNotMatchSharedAccountIDWhenUserDiffers(t *testing.T) {
 	sharedAccountID := "shared-account-id"
 	activeAccount := &config.Account{

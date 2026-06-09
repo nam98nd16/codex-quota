@@ -96,6 +96,9 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 	name := m.displayAccountLabel(acc)
 	subscribed := m.hasSubscription(acc)
 	badgeWidth := m.activeSourceBadgesDisplayWidth(acc)
+	if density == compactRowDensityUltra {
+		badgeWidth = 0
+	}
 	refreshIndicator := m.renderAccountRefreshIndicator(acc, isActive)
 	refreshWidth := m.accountRefreshIndicatorDisplayWidth(acc)
 	nameWidth := accountWidth
@@ -128,15 +131,19 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 		s.WriteString(refreshIndicator)
 		s.WriteString(" ")
 	}
-	if subscribed && isActive {
-		s.WriteString(SubscribedLabelActiveStyle.Render(alignedName))
-	} else if subscribed {
-		s.WriteString(SubscribedLabelMutedStyle.Render(alignedName))
-	} else if isActive {
-		s.WriteString(TabActiveStyle.Render(alignedName))
-	} else {
-		s.WriteString(LabelStyle.Render(alignedName))
+	labelStyle := LabelStyle
+	switch {
+	case subscribed && isActive:
+		labelStyle = SubscribedLabelActiveStyle
+	case subscribed:
+		labelStyle = SubscribedLabelMutedStyle
+	case isActive:
+		labelStyle = TabActiveStyle
 	}
+	if density == compactRowDensityUltra {
+		labelStyle = m.ultraDenseAppliedLabelStyle(acc, isActive, labelStyle)
+	}
+	s.WriteString(labelStyle.Render(alignedName))
 	s.WriteString(" ")
 
 	if err := m.ErrorsMap[acc.Key]; err != nil && !(m.BackgroundErrorMap[acc.Key] && hasRenderableQuotaData(m.UsageData[acc.Key])) {

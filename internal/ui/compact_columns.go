@@ -5,7 +5,7 @@ import "strings"
 const (
 	compactColumnGap               = 2
 	compactMaxColumns              = 5
-	compactFiveColumnTerminalWidth = 222
+	compactFiveColumnTerminalWidth = 210
 	compactMinColumnViewportWidth  = 48
 )
 

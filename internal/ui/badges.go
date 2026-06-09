@@ -3,6 +3,8 @@ package ui
 import (
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/deLiseLINO/codex-quota/internal/config"
 )
 
@@ -93,6 +95,26 @@ func (m Model) activeSourceBadgesDisplayWidth(account *config.Account) int {
 		return 0
 	}
 	return len([]rune(raw)) + 2
+}
+
+func (m Model) ultraDenseAppliedLabelStyle(account *config.Account, isRowActive bool, fallback lipgloss.Style) lipgloss.Style {
+	sources := m.activeTargetSourcesForAccount(account)
+	if len(sources) == 0 {
+		return fallback
+	}
+	if sources[config.SourceCodex] {
+		if isRowActive {
+			return SourceCodexBadgeActiveStyle.Copy().Underline(true)
+		}
+		return SourceCodexBadgeMutedStyle.Copy().Bold(true)
+	}
+	if sources[config.SourceOpenCode] {
+		if isRowActive {
+			return SourceOpenCodeBadgeActiveStyle.Copy().Underline(true)
+		}
+		return SourceOpenCodeBadgeMutedStyle.Copy().Bold(true)
+	}
+	return fallback
 }
 
 func (m Model) renderAccountRefreshIndicator(account *config.Account, isRowActive bool) string {

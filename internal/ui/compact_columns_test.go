@@ -17,8 +17,8 @@ func TestCompactColumnLayoutThresholds(t *testing.T) {
 		{width: 102, want: 2},
 		{width: 152, want: 3},
 		{width: 202, want: 4},
-		{width: 221, want: 4},
-		{width: 222, want: 5},
+		{width: 209, want: 4},
+		{width: 210, want: 5},
 	}
 
 	for _, tc := range cases {
@@ -93,7 +93,7 @@ func TestCompactFourColumnRowsUseDenseRelativeResetText(t *testing.T) {
 }
 
 func TestCompactFiveColumnRowsStayAlignedAndWithinWidth(t *testing.T) {
-	m := testCompactScrollModel(80, 222, 24)
+	m := testCompactScrollModel(80, 210, 24)
 	rendered := ansi.Strip(m.renderCompactViewWithin(m.compactListViewportHeight()))
 	contentWidth := m.compactContentWidth()
 
@@ -119,7 +119,7 @@ func TestCompactFiveColumnRowsStayAlignedAndWithinWidth(t *testing.T) {
 }
 
 func TestCompactFiveColumnRowsUseUltraDenseRelativeResetText(t *testing.T) {
-	m := testCompactScrollModel(80, 222, 24)
+	m := testCompactScrollModel(80, 210, 24)
 	rendered := ansi.Strip(m.renderCompactViewWithin(m.compactListViewportHeight()))
 
 	foundAccountLine := false
