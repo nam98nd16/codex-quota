@@ -25,6 +25,102 @@ func TestAutoSwitchWithPluginInstalledDoesNotUseThreePercentFallback(t *testing.
 	}
 }
 
+func TestAutoSwitchWithPluginInstalledDoesNotUseConfirmedFallbackByDefault(t *testing.T) {
+	m := testAutoSwitchModelWithReplacement()
+	m.OpenCodePluginInstalled = true
+
+	updated, _ := m.Update(DataMsg{
+		AccountKey: "managed:1",
+		Data:       lowFiveHourQuota(0),
+		Background: true,
+		FetchedAt:  time.Now(),
+	})
+	got := updated.(Model)
+
+	if got.activeAccountKey() != "managed:1" {
+		t.Fatalf("active account = %q, want managed:1", got.activeAccountKey())
+	}
+}
+
+func TestAutoSwitchWithPluginInstalledUsesConfirmedZeroQuotaFallbackWhenEnabled(t *testing.T) {
+	m := testAutoSwitchModelWithReplacement()
+	m.OpenCodePluginInstalled = true
+	m.Settings.AutoSwitchConfirmedExhaustedFallback = true
+
+	updated, cmd := m.Update(DataMsg{
+		AccountKey: "managed:1",
+		Data:       lowFiveHourQuota(0),
+		Background: true,
+		FetchedAt:  time.Now(),
+	})
+	got := updated.(Model)
+
+	if got.activeAccountKey() != "managed:2" {
+		t.Fatalf("active account = %q, want managed:2", got.activeAccountKey())
+	}
+	if cmd == nil {
+		t.Fatalf("expected confirmed fallback switch command")
+	}
+}
+
+func TestAutoSwitchWithPluginInstalledUsesLimitReachedFallbackWhenEnabled(t *testing.T) {
+	m := testAutoSwitchModelWithReplacement()
+	m.OpenCodePluginInstalled = true
+	m.Settings.AutoSwitchConfirmedExhaustedFallback = true
+
+	updated, cmd := m.Update(DataMsg{
+		AccountKey: "managed:1",
+		Data:       limitReachedFiveHourQuota(25),
+		Background: true,
+		FetchedAt:  time.Now(),
+	})
+	got := updated.(Model)
+
+	if got.activeAccountKey() != "managed:2" {
+		t.Fatalf("active account = %q, want managed:2", got.activeAccountKey())
+	}
+	if cmd == nil {
+		t.Fatalf("expected limit reached fallback switch command")
+	}
+}
+
+func TestAutoSwitchWithPluginInstalledConfirmedFallbackDoesNotUseThreePercent(t *testing.T) {
+	m := testAutoSwitchModelWithReplacement()
+	m.OpenCodePluginInstalled = true
+	m.Settings.AutoSwitchConfirmedExhaustedFallback = true
+
+	updated, _ := m.Update(DataMsg{
+		AccountKey: "managed:1",
+		Data:       lowFiveHourQuota(2),
+		Background: true,
+		FetchedAt:  time.Now(),
+	})
+	got := updated.(Model)
+
+	if got.activeAccountKey() != "managed:1" {
+		t.Fatalf("active account = %q, want managed:1", got.activeAccountKey())
+	}
+}
+
+func TestAutoSwitchEventOnlyIgnoresConfirmedFallbackToggle(t *testing.T) {
+	m := testAutoSwitchModelWithReplacement()
+	m.OpenCodePluginInstalled = true
+	m.Settings.AutoSwitchTrigger = config.AutoSwitchTriggerEventOnly
+	m.Settings.AutoSwitchConfirmedExhaustedFallback = true
+
+	updated, _ := m.Update(DataMsg{
+		AccountKey: "managed:1",
+		Data:       lowFiveHourQuota(0),
+		Background: true,
+		FetchedAt:  time.Now(),
+	})
+	got := updated.(Model)
+
+	if got.activeAccountKey() != "managed:1" {
+		t.Fatalf("active account = %q, want managed:1", got.activeAccountKey())
+	}
+}
+
 func TestAutoSwitchWithoutPluginUsesThreePercentFallback(t *testing.T) {
 	m := testAutoSwitchModelWithReplacement()
 	m.OpenCodePluginInstalled = false
@@ -117,4 +213,10 @@ func testAutoSwitchModelWithReplacement() Model {
 	m.UsageData = map[string]api.UsageData{"managed:2": usableWeeklyQuota(64)}
 	markAppliedSources(&m, map[config.Source]string{config.SourceCodex: "managed:1", config.SourceOpenCode: "managed:1"})
 	return m
+}
+
+func limitReachedFiveHourQuota(left float64) api.UsageData {
+	data := lowFiveHourQuota(left)
+	data.LimitReached = true
+	return data
 }

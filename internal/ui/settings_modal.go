@@ -20,6 +20,7 @@ const (
 	settingsFieldAutoRefresh settingsField = iota
 	settingsFieldAutoSwitchExhausted
 	settingsFieldAutoSwitchTrigger
+	settingsFieldConfirmedExhaustedFallback
 	settingsFieldPeakStart
 	settingsFieldPeakEnd
 	settingsFieldPeakInterval
@@ -71,6 +72,10 @@ func (m *Model) adjustCurrentSettingsField(delta int, toggle bool) {
 		}
 	case settingsFieldAutoSwitchTrigger:
 		draft.AutoSwitchTrigger = stepAutoSwitchTrigger(draft.AutoSwitchTrigger, delta)
+	case settingsFieldConfirmedExhaustedFallback:
+		if toggle || delta != 0 {
+			draft.AutoSwitchConfirmedExhaustedFallback = !draft.AutoSwitchConfirmedExhaustedFallback
+		}
 	case settingsFieldPeakStart:
 		stepClockValue(&draft.AutoRefreshPeakStart, delta)
 	case settingsFieldPeakEnd:
@@ -131,6 +136,7 @@ func (m Model) renderSettingsModal() string {
 		{label: "Auto refresh", value: onOffText(draft.AutoRefreshEnabled)},
 		{label: "Auto switch exhausted", value: onOffText(draft.AutoSwitchExhausted)},
 		{label: "Auto switch trigger", value: autoSwitchTriggerText(draft.AutoSwitchTrigger)},
+		{label: "Confirmed exhausted fallback", value: onOffText(draft.AutoSwitchConfirmedExhaustedFallback)},
 		{label: "Peak start", value: draft.AutoRefreshPeakStart},
 		{label: "Peak end", value: draft.AutoRefreshPeakEnd},
 		{label: "Peak interval", value: formatMinuteValue(draft.AutoRefreshPeakMinutes)},
@@ -164,6 +170,7 @@ func (m Model) renderSettingsModal() string {
 	lines = append(lines, "")
 	lines = append(lines, InfoValueStyle.Render("Peak window uses the peak interval; all other times use off-peak."))
 	lines = append(lines, InfoValueStyle.Render("With plugin installed, auto switch waits for OpenCode exhausted events."))
+	lines = append(lines, InfoValueStyle.Render("Confirmed exhausted fallback lets plugin mode switch on 0% or LimitReached."))
 	lines = append(lines, InfoValueStyle.Render("Without plugin, legacy fallback switches at <= 3%; manual smart switch still uses <= 3%."))
 	lines = append(lines, InfoValueStyle.Render("Install plugin: cq opencode-plugin install, then restart OpenCode."))
 	lines = append(lines, ActionMenuHintStyle.Render("[↑/↓] Move   [←/→] Adjust   [space] Toggle   [enter] Save   [esc] Cancel"))

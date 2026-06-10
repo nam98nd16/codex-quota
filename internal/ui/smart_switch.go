@@ -222,7 +222,9 @@ func (m *Model) maybeAutoSwitchAfterRefresh(accountKey string) tea.Cmd {
 	}
 
 	manualCheck := m.PendingSmartSwitchManual && m.isPendingSmartSwitchKey(accountKey)
-	shouldCheck := manualCheck || (m.autoSwitchFallbackEnabled() && m.isCurrentAppliedAccountKey(accountKey))
+	autoCheck := m.isCurrentAppliedAccountKey(accountKey) &&
+		(m.autoSwitchFallbackEnabled() || m.autoSwitchConfirmedExhaustedFallbackEnabled())
+	shouldCheck := manualCheck || autoCheck
 	if !shouldCheck {
 		return nil
 	}
@@ -276,14 +278,27 @@ func (m Model) autoSwitchFallbackEnabled() bool {
 	return !m.OpenCodePluginInstalled
 }
 
+func (m Model) autoSwitchConfirmedExhaustedFallbackEnabled() bool {
+	settings := config.NormalizeSettings(m.Settings)
+	if !settings.AutoSwitchExhausted || !settings.AutoSwitchConfirmedExhaustedFallback {
+		return false
+	}
+	return m.OpenCodePluginInstalled && settings.AutoSwitchTrigger == config.AutoSwitchTriggerEventFallback
+}
+
 func (m Model) shouldSwitchAfterRefresh(accountKey string, manualCheck bool) bool {
 	if manualCheck {
 		return m.isCompactAccountExhausted(accountKey) || m.accountAtFallbackSwitchThreshold(accountKey)
 	}
 	if !m.autoSwitchFallbackEnabled() {
-		return false
+		return m.autoSwitchConfirmedExhaustedFallbackEnabled() && m.accountConfirmedExhausted(accountKey)
 	}
 	return m.accountAtFallbackSwitchThreshold(accountKey)
+}
+
+func (m Model) accountConfirmedExhausted(accountKey string) bool {
+	data, ok := m.UsageData[accountKey]
+	return ok && isConfirmedExhausted(data)
 }
 
 func (m Model) accountAtFallbackSwitchThreshold(accountKey string) bool {

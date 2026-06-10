@@ -9,14 +9,15 @@ import (
 )
 
 type Settings struct {
-	CheckForUpdateOnStartup   bool   `json:"check_for_update_on_startup"`
-	AutoRefreshEnabled        bool   `json:"auto_refresh_enabled"`
-	AutoSwitchExhausted       bool   `json:"auto_switch_exhausted"`
-	AutoSwitchTrigger         string `json:"auto_switch_trigger"`
-	AutoRefreshPeakStart      string `json:"auto_refresh_peak_start"`
-	AutoRefreshPeakEnd        string `json:"auto_refresh_peak_end"`
-	AutoRefreshPeakMinutes    int    `json:"auto_refresh_peak_minutes"`
-	AutoRefreshOffPeakMinutes int    `json:"auto_refresh_off_peak_minutes"`
+	CheckForUpdateOnStartup              bool   `json:"check_for_update_on_startup"`
+	AutoRefreshEnabled                   bool   `json:"auto_refresh_enabled"`
+	AutoSwitchExhausted                  bool   `json:"auto_switch_exhausted"`
+	AutoSwitchTrigger                    string `json:"auto_switch_trigger"`
+	AutoSwitchConfirmedExhaustedFallback bool   `json:"auto_switch_confirmed_exhausted_fallback"`
+	AutoRefreshPeakStart                 string `json:"auto_refresh_peak_start"`
+	AutoRefreshPeakEnd                   string `json:"auto_refresh_peak_end"`
+	AutoRefreshPeakMinutes               int    `json:"auto_refresh_peak_minutes"`
+	AutoRefreshOffPeakMinutes            int    `json:"auto_refresh_off_peak_minutes"`
 }
 
 const (
@@ -40,14 +41,15 @@ func DefaultSettings() Settings {
 
 func NormalizeSettings(settings Settings) Settings {
 	defaults := Settings{
-		CheckForUpdateOnStartup:   settings.CheckForUpdateOnStartup,
-		AutoRefreshEnabled:        settings.AutoRefreshEnabled,
-		AutoSwitchExhausted:       settings.AutoSwitchExhausted,
-		AutoSwitchTrigger:         normalizeAutoSwitchTrigger(settings.AutoSwitchTrigger),
-		AutoRefreshPeakStart:      normalizeClockValue(settings.AutoRefreshPeakStart, "08:30"),
-		AutoRefreshPeakEnd:        normalizeClockValue(settings.AutoRefreshPeakEnd, "22:30"),
-		AutoRefreshPeakMinutes:    normalizePositiveMinutes(settings.AutoRefreshPeakMinutes, 5),
-		AutoRefreshOffPeakMinutes: normalizePositiveMinutes(settings.AutoRefreshOffPeakMinutes, 30),
+		CheckForUpdateOnStartup:              settings.CheckForUpdateOnStartup,
+		AutoRefreshEnabled:                   settings.AutoRefreshEnabled,
+		AutoSwitchExhausted:                  settings.AutoSwitchExhausted,
+		AutoSwitchTrigger:                    normalizeAutoSwitchTrigger(settings.AutoSwitchTrigger),
+		AutoSwitchConfirmedExhaustedFallback: settings.AutoSwitchConfirmedExhaustedFallback,
+		AutoRefreshPeakStart:                 normalizeClockValue(settings.AutoRefreshPeakStart, "08:30"),
+		AutoRefreshPeakEnd:                   normalizeClockValue(settings.AutoRefreshPeakEnd, "22:30"),
+		AutoRefreshPeakMinutes:               normalizePositiveMinutes(settings.AutoRefreshPeakMinutes, 5),
+		AutoRefreshOffPeakMinutes:            normalizePositiveMinutes(settings.AutoRefreshOffPeakMinutes, 30),
 	}
 	return defaults
 }
@@ -79,6 +81,9 @@ func LoadSettings() (Settings, error) {
 	if trigger, ok := root["auto_switch_trigger"].(string); ok {
 		settings.AutoSwitchTrigger = trigger
 	}
+	if enabled, ok := root["auto_switch_confirmed_exhausted_fallback"].(bool); ok {
+		settings.AutoSwitchConfirmedExhaustedFallback = enabled
+	}
 	if start, ok := root["auto_refresh_peak_start"].(string); ok {
 		settings.AutoRefreshPeakStart = start
 	}
@@ -104,14 +109,15 @@ func SaveSettings(settings Settings) error {
 	}
 
 	root := map[string]any{
-		"check_for_update_on_startup":   settings.CheckForUpdateOnStartup,
-		"auto_refresh_enabled":          settings.AutoRefreshEnabled,
-		"auto_switch_exhausted":         settings.AutoSwitchExhausted,
-		"auto_switch_trigger":           settings.AutoSwitchTrigger,
-		"auto_refresh_peak_start":       settings.AutoRefreshPeakStart,
-		"auto_refresh_peak_end":         settings.AutoRefreshPeakEnd,
-		"auto_refresh_peak_minutes":     settings.AutoRefreshPeakMinutes,
-		"auto_refresh_off_peak_minutes": settings.AutoRefreshOffPeakMinutes,
+		"check_for_update_on_startup":              settings.CheckForUpdateOnStartup,
+		"auto_refresh_enabled":                     settings.AutoRefreshEnabled,
+		"auto_switch_exhausted":                    settings.AutoSwitchExhausted,
+		"auto_switch_trigger":                      settings.AutoSwitchTrigger,
+		"auto_switch_confirmed_exhausted_fallback": settings.AutoSwitchConfirmedExhaustedFallback,
+		"auto_refresh_peak_start":                  settings.AutoRefreshPeakStart,
+		"auto_refresh_peak_end":                    settings.AutoRefreshPeakEnd,
+		"auto_refresh_peak_minutes":                settings.AutoRefreshPeakMinutes,
+		"auto_refresh_off_peak_minutes":            settings.AutoRefreshOffPeakMinutes,
 	}
 	if err := writeJSONMap(path, root); err != nil {
 		return fmt.Errorf("failed to write %s: %w", path, err)
