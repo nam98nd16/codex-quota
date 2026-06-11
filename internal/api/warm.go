@@ -88,15 +88,16 @@ func WarmCodex(accessToken, accountID string) error {
 }
 
 func newWarmRequest() warmRequest {
+	reply := randomWarmReply()
 	return warmRequest{
 		Model:        "gpt-5.4-mini",
-		Instructions: "Reply exactly: ok",
+		Instructions: "Reply exactly: " + reply,
 		Input: []warmInput{{
 			Type: "message",
 			Role: "user",
 			Content: []warmContent{{
 				Type: "input_text",
-				Text: "Reply with exactly: ok",
+				Text: "Reply with exactly: " + reply,
 			}},
 		}},
 		Tools:             []any{},
@@ -109,6 +110,10 @@ func newWarmRequest() warmRequest {
 	}
 }
 
+func randomWarmReply() string {
+	return "ok-" + randomHexString(3)
+}
+
 func codexResponsesURLFromEnv() string {
 	if value := strings.TrimSpace(os.Getenv("CQ_CODEX_RESPONSES_URL")); value != "" {
 		return value
@@ -117,9 +122,22 @@ func codexResponsesURLFromEnv() string {
 }
 
 func randomHexID() string {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
+	return randomHexString(16)
+}
+
+func randomHexString(byteCount int) string {
+	if byteCount <= 0 {
 		return fmt.Sprintf("%d", time.Now().UnixNano())
 	}
-	return hex.EncodeToString(b[:])
+
+	b := make([]byte, byteCount)
+	if _, err := rand.Read(b); err != nil {
+		fallback := fmt.Sprintf("%x", time.Now().UnixNano())
+		needed := byteCount * 2
+		if len(fallback) >= needed {
+			return fallback[:needed]
+		}
+		return fallback
+	}
+	return hex.EncodeToString(b)
 }
