@@ -231,21 +231,56 @@ func fetchWarmupQuota(account *config.Account) (api.UsageData, error) {
 }
 
 func alreadyWarmedForWindow(account *config.Account, data api.UsageData, state config.WarmupState) bool {
-	resetAt := warmupResetAt(data)
+	window, ok := warmupWindow(data)
+	if !ok {
+		return false
+	}
+	resetAt := window.ResetAt
 	if resetAt.IsZero() {
 		return false
 	}
 	entry, ok := state.Entries[config.WarmupStateKey(account)]
-	return ok && entry.ResetAt.Equal(resetAt)
+	if !ok {
+		return false
+	}
+	if entry.ResetAt.Equal(resetAt) {
+		return true
+	}
+	return warmedInsideWindow(entry.WarmedAt, window)
 }
 
 func warmupResetAt(data api.UsageData) time.Time {
+	window, ok := warmupWindow(data)
+	if !ok {
+		return time.Time{}
+	}
+	return window.ResetAt
+}
+
+func warmupWindow(data api.UsageData) (api.QuotaWindow, bool) {
 	for _, window := range data.Windows {
 		if !window.ResetAt.IsZero() {
-			return window.ResetAt
+			return window, true
 		}
 	}
-	return time.Time{}
+	return api.QuotaWindow{}, false
+}
+
+func warmedInsideWindow(warmedAt time.Time, window api.QuotaWindow) bool {
+	if warmedAt.IsZero() || window.ResetAt.IsZero() || window.WindowSec <= 0 {
+		return false
+	}
+	windowSize := time.Duration(window.WindowSec) * time.Second
+	windowStart := window.ResetAt.Add(-windowSize).Add(-warmupWindowStartTolerance(windowSize))
+	return !warmedAt.Before(windowStart) && warmedAt.Before(window.ResetAt)
+}
+
+func warmupWindowStartTolerance(windowSize time.Duration) time.Duration {
+	tolerance := windowSize / 24
+	if tolerance > 2*time.Hour {
+		return 2 * time.Hour
+	}
+	return tolerance
 }
 
 func isFreePlan(planType string) bool {

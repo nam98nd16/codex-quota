@@ -41,6 +41,71 @@ func TestWarmupCmdSkipsAlreadyWarmedWindow(t *testing.T) {
 	}
 }
 
+func TestWarmupCmdSkipsAlreadyWarmedWhenResetAtDrifts(t *testing.T) {
+	withWarmupHooks(t)
+
+	warmedAt := time.Date(2026, 6, 11, 6, 46, 0, 0, time.UTC)
+	savedResetAt := time.Date(2026, 7, 11, 5, 23, 0, 0, time.UTC)
+	currentResetAt := time.Date(2026, 7, 11, 6, 50, 0, 0, time.UTC)
+	account := testWarmupAccount("account-1", "free")
+	stateKey := config.WarmupStateKey(account)
+	loadWarmupState = func() (config.WarmupState, error) {
+		return config.WarmupState{Entries: map[string]config.WarmupEntry{
+			stateKey: {ResetAt: savedResetAt, WarmedAt: warmedAt},
+		}}, nil
+	}
+	callQuotaAPI = func(accessToken, accountID string) (api.UsageData, error) {
+		return testWarmupUsageWithWindow("free", currentResetAt, 30*24*time.Hour), nil
+	}
+	callWarmCodex = func(accessToken, accountID string) error {
+		t.Fatalf("warm API should not be called for a drifted already-warmed window")
+		return nil
+	}
+
+	msg := WarmupCmd([]*config.Account{account}, warmupSelected)()
+	finished, ok := msg.(WarmupFinishedMsg)
+	if !ok {
+		t.Fatalf("message = %T, want WarmupFinishedMsg", msg)
+	}
+	if len(finished.Results) != 1 || !finished.Results[0].Skipped || finished.Results[0].SkipReason != "already warmed" {
+		t.Fatalf("unexpected result: %#v", finished.Results)
+	}
+}
+
+func TestWarmupCmdAllowsNextQuotaWindow(t *testing.T) {
+	withWarmupHooks(t)
+
+	previousResetAt := time.Date(2026, 7, 11, 5, 23, 0, 0, time.UTC)
+	currentResetAt := previousResetAt.Add(30 * 24 * time.Hour)
+	account := testWarmupAccount("account-1", "free")
+	stateKey := config.WarmupStateKey(account)
+	warmCalls := 0
+	loadWarmupState = func() (config.WarmupState, error) {
+		return config.WarmupState{Entries: map[string]config.WarmupEntry{
+			stateKey: {ResetAt: previousResetAt, WarmedAt: previousResetAt.Add(-29 * 24 * time.Hour)},
+		}}, nil
+	}
+	callQuotaAPI = func(accessToken, accountID string) (api.UsageData, error) {
+		return testWarmupUsageWithWindow("free", currentResetAt, 30*24*time.Hour), nil
+	}
+	callWarmCodex = func(accessToken, accountID string) error {
+		warmCalls++
+		return nil
+	}
+
+	msg := WarmupCmd([]*config.Account{account}, warmupSelected)()
+	finished, ok := msg.(WarmupFinishedMsg)
+	if !ok {
+		t.Fatalf("message = %T, want WarmupFinishedMsg", msg)
+	}
+	if warmCalls != 1 {
+		t.Fatalf("warm calls = %d, want 1", warmCalls)
+	}
+	if len(finished.Results) != 1 || !finished.Results[0].Warmed {
+		t.Fatalf("unexpected result: %#v", finished.Results)
+	}
+}
+
 func TestWarmupCmdAllFreeFiltersAndContinuesAfterFailure(t *testing.T) {
 	withWarmupHooks(t)
 
@@ -323,12 +388,16 @@ func testWarmupAccount(accountID, plan string) *config.Account {
 }
 
 func testWarmupUsage(plan string, resetAt time.Time) api.UsageData {
+	return testWarmupUsageWithWindow(plan, resetAt, 604800*time.Second)
+}
+
+func testWarmupUsageWithWindow(plan string, resetAt time.Time, window time.Duration) api.UsageData {
 	return api.UsageData{
 		PlanType: plan,
 		Allowed:  true,
 		Windows: []api.QuotaWindow{{
 			Label:       "Weekly usage limit",
-			WindowSec:   604800,
+			WindowSec:   int64(window / time.Second),
 			LeftPercent: 90,
 			ResetAt:     resetAt,
 		}},
