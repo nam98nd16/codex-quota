@@ -75,6 +75,77 @@ func TestCompactDefaultSortPrioritizesSubscriptionsThenQuotaResetName(t *testing
 	}
 }
 
+func TestCompactDefaultSortIgnoresStaggeredFetchResetSeconds(t *testing.T) {
+	base := time.Date(2026, time.January, 2, 10, 0, 0, 0, time.UTC)
+	accounts := []*config.Account{
+		{Key: "bravo", Label: "bravo@example.com", Email: "bravo@example.com", AccountID: "bravo", Source: config.SourceManaged, Writable: true},
+		{Key: "alpha", Label: "alpha@example.com", Email: "alpha@example.com", AccountID: "alpha", Source: config.SourceManaged, Writable: true},
+	}
+	m := InitialModel(accounts, map[string][]string{}, map[string][]string{}, true)
+	m.Loading = false
+	m.LoadingMap = map[string]bool{}
+	m.ErrorsMap = map[string]error{}
+	m.PlanTypeByAccount = map[string]string{
+		"alpha": "team",
+		"bravo": "team",
+	}
+	m.UsageData = map[string]api.UsageData{
+		"alpha": {Windows: []api.QuotaWindow{{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 99.4, ResetAt: base.Add(4*time.Hour + 2*time.Minute)}}},
+		"bravo": {Windows: []api.QuotaWindow{{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 99.1, ResetAt: base.Add(4 * time.Hour)}}},
+	}
+	m.UsageDataFetchedAt = map[string]time.Time{
+		"alpha": base.Add(2 * time.Minute),
+		"bravo": base,
+	}
+
+	got := m.compactVisualOrderIndices()
+	want := []int{1, 0}
+	if len(got) != len(want) {
+		t.Fatalf("staggered subscription sort length = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("staggered subscription sort = %v, want %v", got, want)
+		}
+	}
+}
+
+func TestCompactResetSortIgnoresStaggeredFetchResetSeconds(t *testing.T) {
+	base := time.Date(2026, time.January, 2, 10, 0, 0, 0, time.UTC)
+	accounts := []*config.Account{
+		{Key: "bravo", Label: "bravo@example.com", Email: "bravo@example.com", AccountID: "bravo", Source: config.SourceManaged, Writable: true},
+		{Key: "alpha", Label: "alpha@example.com", Email: "alpha@example.com", AccountID: "alpha", Source: config.SourceManaged, Writable: true},
+	}
+	m := InitialModel(accounts, map[string][]string{}, map[string][]string{}, true)
+	m.Loading = false
+	m.LoadingMap = map[string]bool{}
+	m.ErrorsMap = map[string]error{}
+	m.CompactSort = compactSortReset
+	m.PlanTypeByAccount = map[string]string{
+		"alpha": "team",
+		"bravo": "team",
+	}
+	m.UsageData = map[string]api.UsageData{
+		"alpha": {Windows: []api.QuotaWindow{{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 90, ResetAt: base.Add(4*time.Hour + 2*time.Minute)}}},
+		"bravo": {Windows: []api.QuotaWindow{{Label: "Weekly usage limit", WindowSec: 604800, LeftPercent: 90, ResetAt: base.Add(4 * time.Hour)}}},
+	}
+	m.UsageDataFetchedAt = map[string]time.Time{
+		"alpha": base.Add(2 * time.Minute),
+		"bravo": base,
+	}
+
+	got := m.compactVisualOrderIndices()
+	want := []int{1, 0}
+	if len(got) != len(want) {
+		t.Fatalf("staggered reset sort length = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("staggered reset sort = %v, want %v", got, want)
+		}
+	}
+}
+
 func TestCompactPinnedAndCollapsedSections(t *testing.T) {
 	m := compactUXTestModel()
 	m.ActiveSourcesByIdentity = map[string][]string{

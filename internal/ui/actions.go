@@ -185,6 +185,7 @@ func (m Model) beginRefreshActive() (tea.Model, tea.Cmd) {
 		m.LoadingMap = make(map[string]bool)
 	}
 	delete(m.UsageData, m.activeAccountKey())
+	delete(m.UsageDataFetchedAt, m.activeAccountKey())
 	delete(m.ErrorsMap, m.activeAccountKey())
 	delete(m.BackgroundErrorMap, m.activeAccountKey())
 	delete(m.BackgroundLoadingMap, m.activeAccountKey())
@@ -214,6 +215,7 @@ func (m Model) beginRefreshAll() (tea.Model, tea.Cmd) {
 	m.BackgroundErrorMap = make(map[string]bool)
 	m.AutoRefreshPending = make(map[string]bool)
 	m.LastQuotaFetchAt = make(map[string]time.Time)
+	m.UsageDataFetchedAt = make(map[string]time.Time)
 	m.compactBarAnimations = make(map[string]compactBarAnimation)
 	m.tabWindowAnimations = make(map[string]tabWindowAnimation)
 	m.animationTicking = false

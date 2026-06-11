@@ -69,6 +69,7 @@ type Model struct {
 	BackgroundErrorMap        map[string]bool
 	ExhaustedSticky           map[string]bool
 	LastQuotaFetchAt          map[string]time.Time
+	UsageDataFetchedAt        map[string]time.Time
 	AutoRefreshPending        map[string]bool
 	Accounts                  []*config.Account
 	SourcesByAccountID        map[string][]string
@@ -165,6 +166,7 @@ func InitialModelWithStartupUpdate(
 		BackgroundErrorMap:      make(map[string]bool),
 		ExhaustedSticky:         make(map[string]bool),
 		LastQuotaFetchAt:        make(map[string]time.Time),
+		UsageDataFetchedAt:      make(map[string]time.Time),
 		AutoRefreshPending:      make(map[string]bool),
 		PendingSmartSwitchKeys:  make(map[string]bool),
 		SmartSwitchBurstPending: make(map[string]bool),
@@ -497,6 +499,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ErrorsMap = make(map[string]error)
 			m.BackgroundErrorMap = make(map[string]bool)
 			m.LastQuotaFetchAt = make(map[string]time.Time)
+			m.UsageDataFetchedAt = make(map[string]time.Time)
 			m.AutoRefreshPending = make(map[string]bool)
 		}
 		if m.ExhaustedSticky == nil {
@@ -519,6 +522,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.UsageData[msg.AccountKey] = msg.Data
 			m.setKnownPlanType(msg.AccountKey, msg.Data.PlanType)
 			stickyChanged = m.setExhaustedStickyIfConfirmed(msg.AccountKey, msg.Data) || stickyChanged
+			m.recordUsageDataFetch(msg.AccountKey, fetchedAt)
 			m.LoadingMap[msg.AccountKey] = false
 			m.BackgroundLoadingMap[msg.AccountKey] = false
 			delete(m.BackgroundErrorMap, msg.AccountKey)
@@ -676,6 +680,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.BackgroundLoadingMap = make(map[string]bool)
 			m.BackgroundErrorMap = make(map[string]bool)
 			m.LastQuotaFetchAt = make(map[string]time.Time)
+			m.UsageDataFetchedAt = make(map[string]time.Time)
 			m.AutoRefreshPending = make(map[string]bool)
 		}
 		if msg.AccountKey != "" {

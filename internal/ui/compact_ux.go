@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -136,106 +135,6 @@ func (m Model) compactAccountHasForegroundError(account *config.Account) bool {
 	}
 	err := m.ErrorsMap[account.Key]
 	return err != nil && !(m.BackgroundErrorMap[account.Key] && hasRenderableQuotaData(m.UsageData[account.Key]))
-}
-
-func (m Model) sortCompactIndices(indices []int) {
-	if m.CompactSort == compactSortOriginal || len(indices) < 2 {
-		return
-	}
-	sort.SliceStable(indices, func(left, right int) bool {
-		leftAccount := m.Accounts[indices[left]]
-		rightAccount := m.Accounts[indices[right]]
-		switch m.CompactSort {
-		case compactSortSubscriptions:
-			return m.compactSubscriptionSortLess(leftAccount, rightAccount)
-		case compactSortQuota:
-			return m.compactQuotaSortKey(leftAccount) < m.compactQuotaSortKey(rightAccount)
-		case compactSortReset:
-			return m.compactResetSortKey(leftAccount) < m.compactResetSortKey(rightAccount)
-		case compactSortSource:
-			return m.compactSourceSortKey(leftAccount) < m.compactSourceSortKey(rightAccount)
-		case compactSortStatus:
-			return m.compactStatusSortKey(leftAccount) < m.compactStatusSortKey(rightAccount)
-		default:
-			return false
-		}
-	})
-}
-
-func (m Model) compactSubscriptionSortLess(left, right *config.Account) bool {
-	leftSubscribed := m.hasSubscription(left)
-	rightSubscribed := m.hasSubscription(right)
-	if leftSubscribed != rightSubscribed {
-		return leftSubscribed
-	}
-
-	leftQuota := m.compactQuotaSortKey(left)
-	rightQuota := m.compactQuotaSortKey(right)
-	if leftQuota != rightQuota {
-		return leftQuota < rightQuota
-	}
-
-	leftReset := m.compactResetSortKey(left)
-	rightReset := m.compactResetSortKey(right)
-	if leftReset != rightReset {
-		return leftReset < rightReset
-	}
-
-	return m.compactNameSortKey(left) < m.compactNameSortKey(right)
-}
-
-func (m Model) compactQuotaSortKey(account *config.Account) float64 {
-	if account == nil {
-		return 101
-	}
-	if window, ok := compactPrimaryWindow(m.UsageData[account.Key]); ok {
-		return window.LeftPercent
-	}
-	if m.compactAccountHasForegroundError(account) {
-		return 102
-	}
-	return 101
-}
-
-func (m Model) compactResetSortKey(account *config.Account) int64 {
-	if account == nil {
-		return 1<<62 - 1
-	}
-	if window, ok := compactPrimaryWindow(m.UsageData[account.Key]); ok && !window.ResetAt.IsZero() {
-		return window.ResetAt.Unix()
-	}
-	return 1<<62 - 1
-}
-
-func (m Model) compactSourceSortKey(account *config.Account) string {
-	if account == nil {
-		return ""
-	}
-	return strings.ToLower(account.SourceLabel() + " " + m.compactNameSortKey(account))
-}
-
-func (m Model) compactNameSortKey(account *config.Account) string {
-	if account == nil {
-		return ""
-	}
-	return strings.ToLower(m.displayAccountLabel(account))
-}
-
-func (m Model) compactStatusSortKey(account *config.Account) string {
-	if account == nil {
-		return "9"
-	}
-	status := "4-available"
-	if m.compactAccountHasForegroundError(account) {
-		status = "0-error"
-	} else if m.LoadingMap[account.Key] || m.BackgroundLoadingMap[account.Key] {
-		status = "1-loading"
-	} else if _, ok := m.UsageData[account.Key]; !ok {
-		status = "2-queued"
-	} else if m.isCompactAccountExhausted(account.Key) {
-		status = "3-exhausted"
-	}
-	return status + " " + strings.ToLower(m.displayAccountLabel(account))
 }
 
 func (m Model) compactFilterLabel() string {

@@ -223,6 +223,7 @@ func (m *Model) applyWarmupResult(result WarmupAccountResult) {
 	}
 	m.UsageData[result.AccountKey] = result.Data
 	m.setKnownPlanType(result.AccountKey, result.Data.PlanType)
+	m.recordUsageDataFetch(result.AccountKey, time.Now())
 	m.LoadingMap[result.AccountKey] = false
 	delete(m.ErrorsMap, result.AccountKey)
 	if result.AccountKey == m.activeAccountKey() {

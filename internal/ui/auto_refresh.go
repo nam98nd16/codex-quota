@@ -180,6 +180,19 @@ func (m *Model) recordQuotaFetch(accountKey string, fetchedAt time.Time) {
 	delete(m.AutoRefreshPending, accountKey)
 }
 
+func (m *Model) recordUsageDataFetch(accountKey string, fetchedAt time.Time) {
+	if m == nil || strings.TrimSpace(accountKey) == "" {
+		return
+	}
+	if fetchedAt.IsZero() {
+		fetchedAt = time.Now()
+	}
+	if m.UsageDataFetchedAt == nil {
+		m.UsageDataFetchedAt = make(map[string]time.Time)
+	}
+	m.UsageDataFetchedAt[accountKey] = fetchedAt
+}
+
 func (m *Model) clearAutoRefreshPending() {
 	if m == nil || len(m.AutoRefreshPending) == 0 {
 		return
@@ -203,6 +216,11 @@ func (m *Model) pruneAutoRefreshState() {
 	for key := range m.LastQuotaFetchAt {
 		if _, ok := valid[key]; !ok {
 			delete(m.LastQuotaFetchAt, key)
+		}
+	}
+	for key := range m.UsageDataFetchedAt {
+		if _, ok := valid[key]; !ok {
+			delete(m.UsageDataFetchedAt, key)
 		}
 	}
 	for key := range m.AutoRefreshPending {
