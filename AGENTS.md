@@ -5,6 +5,15 @@
 - Use this repository-local guide when publishing a release.
 - Keep the workflow minimal and deterministic.
 
+## Branch Policy
+
+- Use `fork/main` as the canonical branch for active work and releases.
+- Local `main` should track `fork/main` before starting new work.
+- Treat `origin/main` as the upstream project reference only; do not use it as the release base.
+- Keep any local upstream-tracking branch clearly named, for example `upstream-main`.
+- Do not use `fork/release-pr3` for normal work or releases unless explicitly requested.
+- Do not delete legacy branches such as `release-pr3` unless explicitly requested.
+
 ## Publish Steps
 
 1. Check `git status --short --branch`, `git diff --stat`, and recent commits before releasing.
