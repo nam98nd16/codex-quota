@@ -163,8 +163,7 @@ func (m *Model) applyWarmupResult(result WarmupAccountResult) {
 }
 
 func (m Model) renderWarmupConfirmModal() string {
-	count := len(m.warmupAccounts(m.WarmupMode))
-	label := warmupModeLabel(m.WarmupMode)
+	label, count := m.warmupConfirmScopeText()
 	lines := []string{
 		WarningStyle.Render("Warm quota"),
 		InfoValueStyle.Render(fmt.Sprintf("Send a minimal Codex request for %s (%d accounts)?", label, count)),
@@ -173,6 +172,26 @@ func (m Model) renderWarmupConfirmModal() string {
 		ActionMenuHintStyle.Render("[enter] Confirm   [esc] Cancel"),
 	}
 	return InfoBoxStyle.Copy().Width(78).Render(strings.Join(lines, "\n"))
+}
+
+func (m Model) warmupConfirmScopeText() (string, int) {
+	if m.WarmupMode == warmupFree {
+		return "all known free accounts", m.knownFreeWarmupCount()
+	}
+	return warmupModeLabel(m.WarmupMode), len(m.warmupAccounts(m.WarmupMode))
+}
+
+func (m Model) knownFreeWarmupCount() int {
+	count := 0
+	for _, account := range m.Accounts {
+		if account == nil || account.Key == "" {
+			continue
+		}
+		if isFreePlan(m.PlanTypeByAccount[account.Key]) {
+			count++
+		}
+	}
+	return count
 }
 
 func (m Model) renderWarmupSelectModal() string {

@@ -185,6 +185,42 @@ func TestActionMenuShowsWarmupShortcutSequences(t *testing.T) {
 	}
 }
 
+func TestWarmupFreeConfirmCountsKnownFreeAccounts(t *testing.T) {
+	m := testModelForHotkeys(5)
+	m.WarmupConfirm = true
+	m.WarmupMode = warmupFree
+	m.PlanTypeByAccount = map[string]string{
+		"managed:1": "free",
+		"managed:2": "plus",
+		"managed:3": "team",
+		"managed:4": "free",
+		"managed:5": "pro",
+	}
+
+	out := m.renderWarmupConfirmModal()
+	if !strings.Contains(out, "all known free accounts (2 accounts)") {
+		t.Fatalf("expected known free count in modal, got:\n%s", out)
+	}
+	if strings.Contains(out, "(5 accounts)") {
+		t.Fatalf("did not expect all account count for free warmup modal:\n%s", out)
+	}
+}
+
+func TestWarmupAllConfirmCountsAllAccounts(t *testing.T) {
+	m := testModelForHotkeys(5)
+	m.WarmupConfirm = true
+	m.WarmupMode = warmupAll
+	m.PlanTypeByAccount = map[string]string{
+		"managed:1": "free",
+		"managed:2": "plus",
+	}
+
+	out := m.renderWarmupConfirmModal()
+	if !strings.Contains(out, "all accounts (5 accounts)") {
+		t.Fatalf("expected all account count in modal, got:\n%s", out)
+	}
+}
+
 func actionMenuLineContains(out, label, shortcut string) bool {
 	for _, line := range strings.Split(out, "\n") {
 		if strings.Contains(line, label) && strings.Contains(line, shortcut) {
