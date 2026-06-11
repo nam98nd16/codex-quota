@@ -27,6 +27,9 @@ type Model struct {
 	ApplyTargets              map[config.Source]bool
 	ApplyTargetCursor         int
 	ApplyConfirm              bool
+	WarmupConfirm             bool
+	WarmupMode                warmupMode
+	WarmupRunning             bool
 	Settings                  config.Settings
 	SettingsVisible           bool
 	SettingsDraft             config.Settings
@@ -252,6 +255,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.ApplyConfirm {
 			return m.handleApplyConfirm(keyStr)
 		}
+		if m.WarmupConfirm {
+			return m.handleWarmupConfirm(keyStr)
+		}
 		if m.CompactMode {
 			if updated, cmd, handled := m.handleCompactControlKey(keyStr); handled {
 				return updated, cmd
@@ -421,6 +427,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.clearTabWindowAnimations()
 		m.resetDeleteState()
 		m.resetApplyState()
+		m.resetWarmupState()
 		m.resetSettingsState()
 		m.resetSmartSwitchState()
 
@@ -551,6 +558,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.noticeSeq++
 		return m, scheduleNoticeClearCmd(m.noticeSeq)
 
+	case WarmupFinishedMsg:
+		m.Loading = false
+		m.WarmupRunning = false
+		m.WarmupConfirm = false
+		m.WarmupMode = ""
+		m.Err = nil
+		for _, result := range msg.Results {
+			m.applyWarmupResult(result)
+		}
+		m.Notice = warmupSummary(msg.Results, msg.SaveErr)
+		m.noticeSeq++
+		return m, tea.Batch(m.fetchNextCmd(), scheduleNoticeClearCmd(m.noticeSeq))
+
 	case NoticeTimeoutMsg:
 		if msg.Seq != m.noticeSeq {
 			return m, nil
@@ -654,6 +674,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.AddAccountLoginStatus = ""
 		m.resetDeleteState()
 		m.resetApplyState()
+		m.resetWarmupState()
 		return m, nextCmd
 
 	case UpdateAvailableMsg:

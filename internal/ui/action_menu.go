@@ -12,6 +12,9 @@ const (
 	actionMenuApply      = "apply"
 	actionMenuRefresh    = "refresh"
 	actionMenuRefreshAll = "refresh_all"
+	actionMenuWarm       = "warm"
+	actionMenuWarmFree   = "warm_free"
+	actionMenuWarmAll    = "warm_all"
 	actionMenuInfo       = "info"
 	actionMenuAdd        = "add"
 	actionMenuView       = "view"
@@ -46,6 +49,9 @@ func (m Model) actionMenuSections() []actionMenuSection {
 			Title: "Global actions",
 			Items: []actionMenuItem{
 				{ID: actionMenuRefreshAll, Label: "Refresh all", Shortcut: "R"},
+				{ID: actionMenuWarm, Label: "Warm selected quota", Shortcut: ""},
+				{ID: actionMenuWarmFree, Label: "Warm all free", Shortcut: ""},
+				{ID: actionMenuWarmAll, Label: "Warm all", Shortcut: ""},
 				{ID: actionMenuAdd, Label: "Add account", Shortcut: "n"},
 				{ID: actionMenuView, Label: "Switch view", Shortcut: "v"},
 				{ID: actionMenuSettings, Label: "Settings", Shortcut: "t"},

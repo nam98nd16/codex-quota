@@ -129,7 +129,7 @@ func TestBackgroundErrorDoesNotRaiseModalWhenQuotaDataExists(t *testing.T) {
 func TestActionMenuSettingsOpensSettingsOverlay(t *testing.T) {
 	model := testModelForHotkeys(1)
 	model.ActionMenuVisible = true
-	model.ActionMenuCursor = 7
+	model.ActionMenuCursor = 10
 
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got := updated.(Model)

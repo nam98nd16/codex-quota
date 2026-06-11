@@ -54,6 +54,10 @@ func (m Model) currentOverlayModal() string {
 		return m.renderApplyConfirmModal()
 	}
 
+	if m.WarmupConfirm {
+		return m.renderWarmupConfirmModal()
+	}
+
 	if m.Err != nil {
 		return m.renderErrorModal()
 	}
@@ -394,6 +398,7 @@ func (m Model) renderActionMenuModal() string {
 	lines = append(lines, "")
 
 	labelWidth := actionMenuLabelWidth(sections)
+	indexWidth := len(fmt.Sprintf("%d", len(m.actionMenuItems())))
 	index := 0
 	for sectionIx, section := range sections {
 		if strings.TrimSpace(section.Title) != "" {
@@ -406,7 +411,7 @@ func (m Model) renderActionMenuModal() string {
 				cursor = ">"
 				style = ActionMenuSelectedStyle
 			}
-			line := fmt.Sprintf("%s %d. %-*s %s", cursor, index+1, labelWidth, item.Label, item.Shortcut)
+			line := fmt.Sprintf("%s %*d. %-*s %s", cursor, indexWidth, index+1, labelWidth, item.Label, item.Shortcut)
 			lines = append(lines, style.Render(line))
 			index++
 		}

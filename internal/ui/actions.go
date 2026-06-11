@@ -32,6 +32,12 @@ func (m Model) confirmActionMenu() (tea.Model, tea.Cmd) {
 		return m.beginRefreshActive()
 	case actionMenuRefreshAll:
 		return m.beginRefreshAll()
+	case actionMenuWarm:
+		return m.beginWarmup(warmupSelected)
+	case actionMenuWarmFree:
+		return m.beginWarmup(warmupFree)
+	case actionMenuWarmAll:
+		return m.beginWarmup(warmupAll)
 	case actionMenuInfo:
 		m.ShowInfo = true
 		m.Notice = ""
@@ -63,6 +69,7 @@ func (m *Model) openHelpOverlay() {
 	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
+	m.resetWarmupState()
 	m.ShowInfo = false
 	m.Notice = ""
 	m.Err = nil
@@ -80,6 +87,7 @@ func (m *Model) openActionMenu() {
 	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
+	m.resetWarmupState()
 	m.ShowInfo = false
 	m.Notice = ""
 	m.Err = nil
@@ -108,6 +116,7 @@ func (m *Model) openUpdatePrompt() bool {
 	m.Err = nil
 	m.resetDeleteState()
 	m.resetApplyState()
+	m.resetWarmupState()
 	return true
 }
 
@@ -169,6 +178,7 @@ func (m Model) beginRefreshActive() (tea.Model, tea.Cmd) {
 	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
+	m.resetWarmupState()
 	m.Notice = ""
 
 	if m.LoadingMap == nil {
@@ -194,6 +204,7 @@ func (m Model) beginRefreshAll() (tea.Model, tea.Cmd) {
 	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
+	m.resetWarmupState()
 	m.Notice = ""
 
 	m.UsageData = make(map[string]api.UsageData)
@@ -226,6 +237,7 @@ func (m Model) toggleViewMode() (tea.Model, tea.Cmd) {
 	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
+	m.resetWarmupState()
 	m.Notice = ""
 	return m, tea.Batch(m.fetchNextCmd(), m.ensureAnimationTickCmd(), SaveUIStateSnapshotCmd(m.uiStateSnapshot()))
 }
@@ -243,6 +255,7 @@ func (m Model) beginAddAccount() (tea.Model, tea.Cmd) {
 	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
+	m.resetWarmupState()
 	m.ShowInfo = false
 	m.Notice = ""
 	return m, StartAddAccountLoginCmd()
@@ -267,6 +280,7 @@ func (m Model) beginApplyFlow() (tea.Model, tea.Cmd) {
 func (m *Model) startDeleteFlow(sources []config.Source) {
 	m.resetDeleteState()
 	m.resetApplyState()
+	m.resetWarmupState()
 
 	m.DeleteSourceOptions = dedupeSources(sources)
 	m.DeleteSources = make(map[config.Source]bool, len(m.DeleteSourceOptions))
