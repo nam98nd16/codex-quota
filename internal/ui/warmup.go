@@ -25,6 +25,17 @@ type WarmupFinishedMsg struct {
 	SaveErr error
 }
 
+type WarmupStateLoadedMsg struct {
+	State config.WarmupState
+	Err   error
+}
+
+type WarmupStepMsg struct {
+	Result       WarmupAccountResult
+	State        config.WarmupState
+	StateChanged bool
+}
+
 type WarmupAccountResult struct {
 	AccountKey string
 	Label      string
@@ -78,6 +89,43 @@ func WarmupCmd(accounts []*config.Account, mode warmupMode) tea.Cmd {
 		}
 
 		return WarmupFinishedMsg{Mode: mode, Results: results, SaveErr: saveErr}
+	}
+}
+
+func LoadWarmupStateCmd() tea.Cmd {
+	return func() tea.Msg {
+		state, err := loadWarmupState()
+		if err != nil {
+			return WarmupStateLoadedMsg{Err: fmt.Errorf("failed to load warmup state: %w", err)}
+		}
+		return WarmupStateLoadedMsg{State: state}
+	}
+}
+
+func WarmupStepCmd(account *config.Account, mode warmupMode, state config.WarmupState) tea.Cmd {
+	accountSnapshot := cloneAccount(account)
+	return func() tea.Msg {
+		if accountSnapshot == nil {
+			return WarmupStepMsg{State: state}
+		}
+
+		result := warmupOneAccount(accountSnapshot, mode, &state)
+		return WarmupStepMsg{
+			Result:       result,
+			State:        state,
+			StateChanged: result.Warmed,
+		}
+	}
+}
+
+func SaveWarmupStateCmd(state config.WarmupState, changed bool, results []WarmupAccountResult, mode warmupMode) tea.Cmd {
+	resultsSnapshot := append([]WarmupAccountResult(nil), results...)
+	return func() tea.Msg {
+		var saveErr error
+		if changed {
+			saveErr = saveWarmupState(state)
+		}
+		return WarmupFinishedMsg{Mode: mode, Results: resultsSnapshot, SaveErr: saveErr}
 	}
 }
 

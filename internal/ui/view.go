@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -111,6 +112,9 @@ func (m Model) renderFooter() string {
 	}
 	if m.WarmupConfirm {
 		return "Warmup: Enter Confirm • Esc Cancel"
+	}
+	if m.WarmupRunning {
+		return fmt.Sprintf("Warmup: %d/%d (%d%%) • warmed %d • skipped %d • failed %d", m.WarmupCompleted, m.WarmupTotal, m.warmupProgressPercent(), m.WarmupWarmed, m.WarmupSkipped, m.WarmupFailed)
 	}
 	if m.CompactMode {
 		if m.CompactSearchActive {

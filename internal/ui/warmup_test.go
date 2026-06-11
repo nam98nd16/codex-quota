@@ -95,6 +95,7 @@ func TestActionMenuWarmFreeRequiresConfirmation(t *testing.T) {
 	m := testModelForHotkeys(2)
 	m.ActionMenuVisible = true
 	m.ActionMenuCursor = 6
+	m.PlanTypeByAccount = map[string]string{"managed:1": "free"}
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got := updated.(Model)
@@ -125,6 +126,7 @@ func TestWarmupShortcutOpensChooser(t *testing.T) {
 }
 
 func TestWarmupChooserSelectedStartsWarmup(t *testing.T) {
+	withWarmupHooks(t)
 	m := testModelForHotkeys(1)
 	m.WarmupSelect = true
 
@@ -132,10 +134,13 @@ func TestWarmupChooserSelectedStartsWarmup(t *testing.T) {
 	got := updated.(Model)
 
 	if cmd == nil {
-		t.Fatalf("expected selected warmup command")
+		t.Fatalf("expected warmup state load command")
 	}
 	if got.WarmupSelect || !got.WarmupRunning || got.WarmupMode != warmupSelected {
 		t.Fatalf("expected selected warmup running, got select=%v running=%v mode=%q", got.WarmupSelect, got.WarmupRunning, got.WarmupMode)
+	}
+	if got.WarmupTotal != 1 || got.WarmupCompleted != 0 {
+		t.Fatalf("expected initial progress 0/1, got %d/%d", got.WarmupCompleted, got.WarmupTotal)
 	}
 }
 
@@ -152,6 +157,7 @@ func TestWarmupChooserBatchModesRequireConfirmation(t *testing.T) {
 		t.Run(string(tc.key), func(t *testing.T) {
 			m := testModelForHotkeys(2)
 			m.WarmupSelect = true
+			m.PlanTypeByAccount = map[string]string{"managed:1": "free"}
 
 			updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{tc.key}})
 			got := updated.(Model)
@@ -163,6 +169,61 @@ func TestWarmupChooserBatchModesRequireConfirmation(t *testing.T) {
 				t.Fatalf("expected batch confirmation for %q, got select=%v confirm=%v mode=%q", tc.key, got.WarmupSelect, got.WarmupConfirm, got.WarmupMode)
 			}
 		})
+	}
+}
+
+func TestWarmupProgressModalShowsCountsAndPercent(t *testing.T) {
+	m := testModelForHotkeys(3)
+	m.WarmupRunning = true
+	m.WarmupMode = warmupFree
+	m.WarmupTotal = 3
+	m.WarmupCompleted = 1
+	m.WarmupWarmed = 1
+	m.WarmupSkipped = 0
+	m.WarmupFailed = 0
+	m.WarmupCurrentLabel = "next@example.com"
+	m.WarmupStartedAt = time.Now().Add(-90 * time.Second)
+	m.WarmupResults = []WarmupAccountResult{{
+		Account: testWarmupAccount("done", "free"),
+		Warmed:  true,
+	}}
+
+	out := m.renderWarmupProgressModal()
+	for _, want := range []string{"Progress: 1 / 3 (33%)", "Current: next@example.com", "Warmed 1", "Skipped 0", "Failed 0", "Last: warmed"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected progress modal to contain %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestWarmupStepUpdatesProgressAndSchedulesNext(t *testing.T) {
+	withWarmupHooks(t)
+	m := testModelForHotkeys(2)
+	m.WarmupRunning = true
+	m.WarmupMode = warmupAll
+	m.WarmupAccounts = cloneAccounts(m.Accounts)
+	m.WarmupTotal = 2
+	m.warmupState = config.WarmupState{Entries: map[string]config.WarmupEntry{}}
+
+	updated, cmd := m.Update(WarmupStepMsg{
+		Result: WarmupAccountResult{
+			AccountKey: "managed:1",
+			Account:    m.Accounts[0],
+			Warmed:     true,
+		},
+		State:        config.WarmupState{Entries: map[string]config.WarmupEntry{}},
+		StateChanged: true,
+	})
+	got := updated.(Model)
+
+	if cmd == nil {
+		t.Fatalf("expected next warmup step command")
+	}
+	if got.WarmupCompleted != 1 || got.WarmupWarmed != 1 || got.WarmupTotal != 2 {
+		t.Fatalf("unexpected progress: completed=%d warmed=%d total=%d", got.WarmupCompleted, got.WarmupWarmed, got.WarmupTotal)
+	}
+	if !got.warmupStateChanged {
+		t.Fatalf("expected warmup state to be marked changed")
 	}
 }
 

@@ -31,6 +31,18 @@ type Model struct {
 	WarmupSelect              bool
 	WarmupMode                warmupMode
 	WarmupRunning             bool
+	WarmupAccounts            []*config.Account
+	WarmupResults             []WarmupAccountResult
+	WarmupTotal               int
+	WarmupCompleted           int
+	WarmupWarmed              int
+	WarmupSkipped             int
+	WarmupFailed              int
+	WarmupCurrentLabel        string
+	WarmupStartedAt           time.Time
+	WarmupSaveErr             error
+	warmupState               config.WarmupState
+	warmupStateChanged        bool
 	Settings                  config.Settings
 	SettingsVisible           bool
 	SettingsDraft             config.Settings
@@ -571,6 +583,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.WarmupConfirm = false
 		m.WarmupSelect = false
 		m.WarmupMode = ""
+		m.WarmupCurrentLabel = ""
+		m.WarmupSaveErr = msg.SaveErr
 		m.Err = nil
 		for _, result := range msg.Results {
 			m.applyWarmupResult(result)
@@ -578,6 +592,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Notice = warmupSummary(msg.Results, msg.SaveErr)
 		m.noticeSeq++
 		return m, tea.Batch(m.fetchNextCmd(), scheduleNoticeClearCmd(m.noticeSeq))
+
+	case WarmupStateLoadedMsg:
+		if msg.Err != nil {
+			m.Loading = false
+			m.WarmupRunning = false
+			m.resetWarmupProgressState()
+			m.Err = msg.Err
+			m.Notice = ""
+			return m, nil
+		}
+		m.warmupState = msg.State
+		if m.warmupState.Entries == nil {
+			m.warmupState.Entries = map[string]config.WarmupEntry{}
+		}
+		return m, m.nextWarmupStepCmd(false)
+
+	case WarmupStepMsg:
+		m.applyWarmupStep(msg)
+		if m.WarmupCompleted >= m.WarmupTotal {
+			m.WarmupCurrentLabel = "saving results"
+			return m, SaveWarmupStateCmd(m.warmupState, m.warmupStateChanged, m.WarmupResults, m.WarmupMode)
+		}
+		return m, m.nextWarmupStepCmd(msg.Result.Warmed)
 
 	case NoticeTimeoutMsg:
 		if msg.Seq != m.noticeSeq {

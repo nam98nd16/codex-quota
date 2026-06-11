@@ -62,6 +62,10 @@ func (m Model) currentOverlayModal() string {
 		return m.renderWarmupConfirmModal()
 	}
 
+	if m.WarmupRunning {
+		return m.renderWarmupProgressModal()
+	}
+
 	if m.Err != nil {
 		return m.renderErrorModal()
 	}
