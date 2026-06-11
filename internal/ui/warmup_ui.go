@@ -26,6 +26,7 @@ func (m Model) beginWarmup(mode warmupMode) (tea.Model, tea.Cmd) {
 	m.closeCompactSearch()
 	m.resetDeleteState()
 	m.resetApplyState()
+	m.WarmupSelect = false
 	m.ShowInfo = false
 	m.Err = nil
 	m.Notice = ""
@@ -36,6 +37,47 @@ func (m Model) beginWarmup(mode warmupMode) (tea.Model, tea.Cmd) {
 	}
 
 	m.WarmupConfirm = true
+	return m, nil
+}
+
+func (m Model) beginWarmupSelect() (tea.Model, tea.Cmd) {
+	if len(m.Accounts) == 0 {
+		m.Notice = "no accounts available for warmup"
+		m.noticeSeq++
+		return m, scheduleNoticeClearCmd(m.noticeSeq)
+	}
+
+	m.resetHelpState()
+	m.resetActionMenuState()
+	m.resetSettingsState()
+	m.closeCompactDetail()
+	m.closeCompactSearch()
+	m.resetDeleteState()
+	m.resetApplyState()
+	m.ShowInfo = false
+	m.Err = nil
+	m.Notice = ""
+	m.WarmupConfirm = false
+	m.WarmupMode = ""
+	m.WarmupSelect = true
+	return m, nil
+}
+
+func (m Model) handleWarmupSelect(keyStr string) (tea.Model, tea.Cmd) {
+	switch keyStr {
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "esc":
+		m.resetWarmupState()
+		return m, nil
+	case "s":
+		return m.beginWarmup(warmupSelected)
+	case "f":
+		return m.beginWarmup(warmupFree)
+	case "a":
+		return m.beginWarmup(warmupAll)
+	}
+
 	return m, nil
 }
 
@@ -62,6 +104,7 @@ func (m Model) handleWarmupConfirm(keyStr string) (tea.Model, tea.Cmd) {
 
 func (m Model) startWarmup(accounts []*config.Account, mode warmupMode) (tea.Model, tea.Cmd) {
 	m.WarmupConfirm = false
+	m.WarmupSelect = false
 	m.WarmupRunning = true
 	m.WarmupMode = mode
 	m.Loading = true
@@ -75,6 +118,7 @@ func (m *Model) resetWarmupState() {
 		return
 	}
 	m.WarmupConfirm = false
+	m.WarmupSelect = false
 	m.WarmupMode = ""
 }
 
@@ -129,4 +173,18 @@ func (m Model) renderWarmupConfirmModal() string {
 		ActionMenuHintStyle.Render("[enter] Confirm   [esc] Cancel"),
 	}
 	return InfoBoxStyle.Copy().Width(78).Render(strings.Join(lines, "\n"))
+}
+
+func (m Model) renderWarmupSelectModal() string {
+	lines := []string{
+		WarningStyle.Render("Warm quota"),
+		InfoValueStyle.Render("Choose warmup scope:"),
+		"",
+		InfoValueStyle.Render("s  Selected account"),
+		InfoValueStyle.Render("f  All free accounts"),
+		InfoValueStyle.Render("a  All accounts"),
+		"",
+		ActionMenuHintStyle.Render("[s/f/a] Select   [esc] Cancel"),
+	}
+	return InfoBoxStyle.Copy().Width(52).Render(strings.Join(lines, "\n"))
 }

@@ -28,6 +28,7 @@ type Model struct {
 	ApplyTargetCursor         int
 	ApplyConfirm              bool
 	WarmupConfirm             bool
+	WarmupSelect              bool
 	WarmupMode                warmupMode
 	WarmupRunning             bool
 	Settings                  config.Settings
@@ -255,6 +256,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.ApplyConfirm {
 			return m.handleApplyConfirm(keyStr)
 		}
+		if m.WarmupSelect {
+			return m.handleWarmupSelect(keyStr)
+		}
 		if m.WarmupConfirm {
 			return m.handleWarmupConfirm(keyStr)
 		}
@@ -312,6 +316,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "R":
 			return m.beginRefreshAll()
+
+		case "w":
+			return m.beginWarmupSelect()
 
 		case "i":
 			m.resetHelpState()
@@ -562,6 +569,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Loading = false
 		m.WarmupRunning = false
 		m.WarmupConfirm = false
+		m.WarmupSelect = false
 		m.WarmupMode = ""
 		m.Err = nil
 		for _, result := range msg.Results {

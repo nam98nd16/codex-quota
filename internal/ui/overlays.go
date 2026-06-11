@@ -54,6 +54,10 @@ func (m Model) currentOverlayModal() string {
 		return m.renderApplyConfirmModal()
 	}
 
+	if m.WarmupSelect {
+		return m.renderWarmupSelectModal()
+	}
+
 	if m.WarmupConfirm {
 		return m.renderWarmupConfirmModal()
 	}
@@ -248,6 +252,10 @@ func (m Model) renderHelpModal() string {
 		HelpSectionStyle.Render("Primary"),
 		renderHelpLine(primaryMove, "Move between accounts"),
 		renderHelpLine("Enter", "Open account menu"),
+		renderHelpLine("w", "Open warmup actions"),
+		renderHelpLine("w s", "Warm selected account"),
+		renderHelpLine("w f", "Warm all free accounts"),
+		renderHelpLine("w a", "Warm all accounts"),
 		renderHelpLine("o", "Apply to Codex/OpenCode"),
 		renderHelpLine("r", "Refresh active account"),
 		renderHelpLine("s", "Refresh, switch, and apply if exhausted"),

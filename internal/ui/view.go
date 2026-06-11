@@ -106,19 +106,25 @@ func (m Model) renderHeader() string {
 }
 
 func (m Model) renderFooter() string {
+	if m.WarmupSelect {
+		return "Warmup: s Selected • f Free • a All • Esc Cancel"
+	}
+	if m.WarmupConfirm {
+		return "Warmup: Enter Confirm • Esc Cancel"
+	}
 	if m.CompactMode {
 		if m.CompactSearchActive {
 			return "Search: type to filter • Enter Close • Esc Cancel • Ctrl+U Clear"
 		}
 		if m.Width >= 118 {
-			return "↑↓ Move • Ctrl+F Search • f Filter • g Sort • d Detail • Enter Menu • ? Help • q Quit"
+			return "↑↓ Move • Ctrl+F Search • f Filter • g Sort • d Detail • w Warmup • Enter Menu • ? Help"
 		}
 		if m.Width >= 84 {
-			return "↑↓ Move • Ctrl+F Search • f Filter • g Sort • d Detail • ? Help"
+			return "↑↓ Move • Ctrl+F Search • f Filter • g Sort • w Warmup • ? Help"
 		}
 		return "↑↓ Move • Ctrl+F Search • Enter Menu • ? Help"
 	}
-	return "←→ Move • Enter Menu • ? Help • q Quit"
+	return "←→ Move • w Warmup • Enter Menu • ? Help • q Quit"
 }
 
 func (m Model) overlayUpdateHint(base string) string {

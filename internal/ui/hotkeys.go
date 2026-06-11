@@ -139,6 +139,8 @@ func (m Model) handleActionMenu(keyStr string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "enter":
 		return m.confirmActionMenu()
+	case "w":
+		return m.beginWarmupSelect()
 	}
 
 	if len(keyStr) == 1 && keyStr[0] >= '1' && keyStr[0] <= '9' {

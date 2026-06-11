@@ -2,6 +2,7 @@ package ui
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -104,6 +105,93 @@ func TestActionMenuWarmFreeRequiresConfirmation(t *testing.T) {
 	if !got.WarmupConfirm || got.WarmupMode != warmupFree {
 		t.Fatalf("expected warmup free confirmation, got confirm=%v mode=%q", got.WarmupConfirm, got.WarmupMode)
 	}
+}
+
+func TestWarmupShortcutOpensChooser(t *testing.T) {
+	m := testModelForHotkeys(1)
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
+	got := updated.(Model)
+
+	if cmd != nil {
+		t.Fatalf("expected no command when opening chooser")
+	}
+	if !got.WarmupSelect {
+		t.Fatalf("expected warmup chooser to open")
+	}
+	if !strings.Contains(got.renderFooter(), "s Selected") || !strings.Contains(got.renderFooter(), "f Free") || !strings.Contains(got.renderFooter(), "a All") {
+		t.Fatalf("expected footer to show warmup choices, got %q", got.renderFooter())
+	}
+}
+
+func TestWarmupChooserSelectedStartsWarmup(t *testing.T) {
+	m := testModelForHotkeys(1)
+	m.WarmupSelect = true
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	got := updated.(Model)
+
+	if cmd == nil {
+		t.Fatalf("expected selected warmup command")
+	}
+	if got.WarmupSelect || !got.WarmupRunning || got.WarmupMode != warmupSelected {
+		t.Fatalf("expected selected warmup running, got select=%v running=%v mode=%q", got.WarmupSelect, got.WarmupRunning, got.WarmupMode)
+	}
+}
+
+func TestWarmupChooserBatchModesRequireConfirmation(t *testing.T) {
+	tests := []struct {
+		key  rune
+		mode warmupMode
+	}{
+		{key: 'f', mode: warmupFree},
+		{key: 'a', mode: warmupAll},
+	}
+
+	for _, tc := range tests {
+		t.Run(string(tc.key), func(t *testing.T) {
+			m := testModelForHotkeys(2)
+			m.WarmupSelect = true
+
+			updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{tc.key}})
+			got := updated.(Model)
+
+			if cmd != nil {
+				t.Fatalf("expected no command before batch confirmation")
+			}
+			if got.WarmupSelect || !got.WarmupConfirm || got.WarmupMode != tc.mode {
+				t.Fatalf("expected batch confirmation for %q, got select=%v confirm=%v mode=%q", tc.key, got.WarmupSelect, got.WarmupConfirm, got.WarmupMode)
+			}
+		})
+	}
+}
+
+func TestActionMenuShowsWarmupShortcutSequences(t *testing.T) {
+	m := testModelForHotkeys(1)
+	m.ActionMenuVisible = true
+	out := m.renderActionMenuModal()
+
+	for _, tc := range []struct {
+		label    string
+		shortcut string
+	}{
+		{label: "Warm selected quota", shortcut: "w s"},
+		{label: "Warm all free", shortcut: "w f"},
+		{label: "Warm all", shortcut: "w a"},
+	} {
+		if !actionMenuLineContains(out, tc.label, tc.shortcut) {
+			t.Fatalf("expected action menu line to contain %q and %q:\n%s", tc.label, tc.shortcut, out)
+		}
+	}
+}
+
+func actionMenuLineContains(out, label, shortcut string) bool {
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, label) && strings.Contains(line, shortcut) {
+			return true
+		}
+	}
+	return false
 }
 
 func withWarmupHooks(t *testing.T) {
