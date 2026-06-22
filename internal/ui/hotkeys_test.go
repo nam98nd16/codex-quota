@@ -415,6 +415,90 @@ func TestRefreshAllInCompactLoadsByVisualOrderWithExhaustedBlock(t *testing.T) {
 	}
 }
 
+func TestCompactEResetShortcutOpensConfirmWhenCreditsAvailable(t *testing.T) {
+	m := testModelForHotkeys(2)
+	m.CompactMode = true
+	available := int64(1)
+	m.UsageData["managed:1"] = api.UsageData{AvailableRateLimitResetCredits: &available}
+	m.Data = m.UsageData["managed:1"]
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	got := updated.(Model)
+
+	if cmd != nil {
+		t.Fatalf("did not expect consume command before confirmation")
+	}
+	if !got.RateLimitResetVisible || got.RateLimitResetStage != rateLimitResetConfirm {
+		t.Fatalf("expected reset confirmation modal, visible=%v stage=%q", got.RateLimitResetVisible, got.RateLimitResetStage)
+	}
+	if got.CompactExhaustedCollapsed {
+		t.Fatalf("did not expect lowercase e to toggle exhausted collapse")
+	}
+}
+
+func TestCompactEResetShortcutDoesNothingWithoutCredits(t *testing.T) {
+	m := testModelForHotkeys(2)
+	m.CompactMode = true
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	got := updated.(Model)
+
+	if cmd != nil {
+		t.Fatalf("did not expect command without reset credits")
+	}
+	if got.RateLimitResetVisible {
+		t.Fatalf("did not expect reset modal without credits")
+	}
+	if got.CompactExhaustedCollapsed {
+		t.Fatalf("did not expect lowercase e to toggle exhausted collapse")
+	}
+}
+
+func TestCompactShiftETogglesExhaustedCollapse(t *testing.T) {
+	m := testModelForHotkeys(2)
+	m.CompactMode = true
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'E'}})
+	got := updated.(Model)
+
+	if !got.CompactExhaustedCollapsed {
+		t.Fatalf("expected uppercase E to toggle exhausted collapse")
+	}
+	if got.RateLimitResetVisible {
+		t.Fatalf("did not expect uppercase E to open reset modal")
+	}
+}
+
+func TestCompactResetShortcutThenConfirmConsumes(t *testing.T) {
+	withFetchHooks(t)
+	consumeCalls := 0
+	consumeResetCredit = func(accessToken, accountID, redeemRequestID string) (api.RateLimitResetResult, error) {
+		consumeCalls++
+		return api.RateLimitResetResult{Outcome: api.RateLimitResetOutcomeReset}, nil
+	}
+
+	m := testModelForHotkeys(1)
+	m.CompactMode = true
+	available := int64(1)
+	m.UsageData["managed:1"] = api.UsageData{AvailableRateLimitResetCredits: &available}
+	m.Data = m.UsageData["managed:1"]
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	got := updated.(Model)
+	if cmd != nil || !got.RateLimitResetVisible || got.RateLimitResetStage != rateLimitResetConfirm {
+		t.Fatalf("expected reset confirmation before consuming, stage=%q cmd=%v", got.RateLimitResetStage, cmd)
+	}
+
+	updated, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = updated.(Model)
+	if cmd == nil || got.RateLimitResetStage != rateLimitResetRunning {
+		t.Fatalf("expected confirm to consume, stage=%q cmd=%v", got.RateLimitResetStage, cmd)
+	}
+	_ = cmd().(RateLimitResetConsumedMsg)
+	if consumeCalls != 1 {
+		t.Fatalf("consume calls = %d, want 1", consumeCalls)
+	}
+}
+
 func TestCompactArrowNavigationFollowsVisualOrderWithExhaustedBlock(t *testing.T) {
 	m := testModelForHotkeys(4)
 	m.CompactMode = true

@@ -286,6 +286,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleRateLimitResetOverlay(keyStr)
 		}
 		if m.CompactMode {
+			if keyStr == "e" {
+				if available, ok := m.activeRateLimitResetCredits(); ok && available > 0 {
+					return m.beginRateLimitResetFlow()
+				}
+				return m, nil
+			}
 			if updated, cmd, handled := m.handleCompactControlKey(keyStr); handled {
 				return updated, cmd
 			}

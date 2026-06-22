@@ -123,11 +123,15 @@ func (m Model) renderFooter() string {
 		if m.CompactSearchActive {
 			return "Search: type to filter • Enter Close • Esc Cancel • Ctrl+U Clear"
 		}
+		resetHint := ""
+		if available, ok := m.activeRateLimitResetCredits(); ok && available > 0 {
+			resetHint = " • e Reset"
+		}
 		if m.Width >= 118 {
-			return "↑↓ Move • Ctrl+F Search • f Filter • g Sort • d Detail • w Warmup • Enter Menu • ? Help"
+			return "↑↓ Move • Ctrl+F Search • f Filter • g Sort • d Detail • w Warmup" + resetHint + " • E Collapse • Enter Menu • ? Help"
 		}
 		if m.Width >= 84 {
-			return "↑↓ Move • Ctrl+F Search • f Filter • g Sort • w Warmup • ? Help"
+			return "↑↓ Move • Ctrl+F Search • f Filter • g Sort • w Warmup" + resetHint + " • ? Help"
 		}
 		return "↑↓ Move • Ctrl+F Search • Enter Menu • ? Help"
 	}

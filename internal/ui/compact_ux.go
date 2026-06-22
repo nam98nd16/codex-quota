@@ -268,7 +268,7 @@ func (m Model) handleCompactControlKey(keyStr string) (tea.Model, tea.Cmd, bool)
 	case "p":
 		m.toggleCompactPinApplied()
 		return m, m.syncAndFetchActiveAccount(), true
-	case "e":
+	case "E":
 		m.toggleCompactExhaustedCollapsed()
 		return m, m.syncAndFetchActiveAccount(), true
 	case "d":
