@@ -41,6 +41,14 @@ type NoticeTimeoutMsg struct {
 	Seq int
 }
 
+type RateLimitResetConsumedMsg struct {
+	AccountKey      string
+	Account         *config.Account
+	RedeemRequestID string
+	Result          api.RateLimitResetResult
+	Err             error
+}
+
 type AddAccountLoginStartedMsg struct {
 	AuthURL           string
 	BrowserOpenFailed bool

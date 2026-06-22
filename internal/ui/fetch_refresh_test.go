@@ -140,15 +140,18 @@ func withFetchHooks(t *testing.T) {
 	originalSoon := shouldRefreshTokenSoon
 	originalRefresh := refreshAccountToken
 	originalAPI := callQuotaAPI
+	originalConsume := consumeResetCredit
 	isTokenExpired = func(account *config.Account) bool { return false }
 	shouldRefreshTokenSoon = func(account *config.Account) bool { return true }
 	refreshAccountToken = auth.RefreshToken
 	callQuotaAPI = api.CallAPI
+	consumeResetCredit = api.ConsumeRateLimitResetCredit
 	t.Cleanup(func() {
 		isTokenExpired = originalExpired
 		shouldRefreshTokenSoon = originalSoon
 		refreshAccountToken = originalRefresh
 		callQuotaAPI = originalAPI
+		consumeResetCredit = originalConsume
 	})
 }
 

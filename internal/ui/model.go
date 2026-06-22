@@ -43,6 +43,12 @@ type Model struct {
 	WarmupSaveErr             error
 	warmupState               config.WarmupState
 	warmupStateChanged        bool
+	RateLimitResetVisible     bool
+	RateLimitResetStage       rateLimitResetStage
+	RateLimitResetCursor      int
+	RateLimitResetAccountKey  string
+	RateLimitResetRequestID   string
+	RateLimitResetMessage     string
 	Settings                  config.Settings
 	SettingsVisible           bool
 	SettingsDraft             config.Settings
@@ -276,6 +282,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.WarmupConfirm {
 			return m.handleWarmupConfirm(keyStr)
 		}
+		if m.RateLimitResetVisible {
+			return m.handleRateLimitResetOverlay(keyStr)
+		}
 		if m.CompactMode {
 			if updated, cmd, handled := m.handleCompactControlKey(keyStr); handled {
 				return updated, cmd
@@ -451,6 +460,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resetWarmupState()
 		m.resetSettingsState()
 		m.resetSmartSwitchState()
+		m.resetRateLimitResetState()
 
 		if len(m.Accounts) == 0 {
 			m.Loading = false
@@ -612,6 +622,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.nextWarmupStepCmd(false)
 
+	case RateLimitResetConsumedMsg:
+		return m.handleRateLimitResetConsumed(msg)
+
 	case WarmupStepMsg:
 		m.applyWarmupStep(msg)
 		if m.WarmupCompleted >= m.WarmupTotal {
@@ -725,6 +738,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resetDeleteState()
 		m.resetApplyState()
 		m.resetWarmupState()
+		m.resetRateLimitResetState()
 		return m, nextCmd
 
 	case UpdateAvailableMsg:

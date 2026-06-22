@@ -11,6 +11,7 @@ import (
 const (
 	actionMenuApply      = "apply"
 	actionMenuRefresh    = "refresh"
+	actionMenuResetLimit = "reset_limit"
 	actionMenuRefreshAll = "refresh_all"
 	actionMenuWarm       = "warm"
 	actionMenuWarmFree   = "warm_free"
@@ -57,6 +58,9 @@ func (m Model) actionMenuSections() []actionMenuSection {
 				{ID: actionMenuSettings, Label: "Settings", Shortcut: "t"},
 			},
 		},
+	}
+	if available, ok := m.activeRateLimitResetCredits(); ok && available > 0 {
+		sections[0].Items = append(sections[0].Items, actionMenuItem{ID: actionMenuResetLimit, Label: "Use rate-limit reset", Shortcut: "e"})
 	}
 	if strings.TrimSpace(m.UpdatePromptVersion) != "" && update.SupportsAutoUpdate(m.UpdatePromptMethod) {
 		sections[1].Items = append(sections[1].Items, actionMenuItem{ID: actionMenuUpdate, Label: "Install update", Shortcut: "u"})

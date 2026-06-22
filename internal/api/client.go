@@ -13,10 +13,11 @@ import (
 const usageURL = "https://chatgpt.com/backend-api/wham/usage"
 
 type UsageData struct {
-	PlanType     string
-	Allowed      bool
-	LimitReached bool
-	Windows      []QuotaWindow
+	PlanType                       string
+	Allowed                        bool
+	LimitReached                   bool
+	Windows                        []QuotaWindow
+	AvailableRateLimitResetCredits *int64
 }
 
 type QuotaWindow struct {
@@ -33,8 +34,13 @@ type HTTPError struct {
 }
 
 type usageResponse struct {
-	PlanType  string          `json:"plan_type"`
-	RateLimit rateLimitStatus `json:"rate_limit"`
+	PlanType              string                        `json:"plan_type"`
+	RateLimit             rateLimitStatus               `json:"rate_limit"`
+	RateLimitResetCredits *RateLimitResetCreditsSummary `json:"rate_limit_reset_credits"`
+}
+
+type RateLimitResetCreditsSummary struct {
+	AvailableCount int64 `json:"available_count"`
 }
 
 type rateLimitStatus struct {
@@ -116,6 +122,10 @@ func CallAPI(accessToken, accountID string) (UsageData, error) {
 		Allowed:      payload.RateLimit.Allowed,
 		LimitReached: payload.RateLimit.LimitReached,
 		Windows:      windows,
+	}
+	if payload.RateLimitResetCredits != nil {
+		available := payload.RateLimitResetCredits.AvailableCount
+		data.AvailableRateLimitResetCredits = &available
 	}
 
 	return data, nil

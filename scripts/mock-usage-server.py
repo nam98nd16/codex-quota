@@ -14,6 +14,7 @@ def build_payload(account_id: str) -> dict:
             "plan_type": "plus",
             "allowed": True,
             "limit_reached": False,
+            "reset_credits": 1,
             "primary_window": {
                 "limit_window_seconds": 18000,
                 "used_percent": 34.0,
@@ -62,6 +63,7 @@ def build_payload(account_id: str) -> dict:
             "plan_type": "free",
             "allowed": False,
             "limit_reached": True,
+            "reset_credits": 1,
             "primary_window": None,
             "secondary_window": {
                 "limit_window_seconds": 604800,
@@ -73,6 +75,7 @@ def build_payload(account_id: str) -> dict:
             "plan_type": "free",
             "allowed": False,
             "limit_reached": True,
+            "reset_credits": 2,
             "primary_window": None,
             "secondary_window": {
                 "limit_window_seconds": 604800,
@@ -84,6 +87,7 @@ def build_payload(account_id: str) -> dict:
             "plan_type": "free",
             "allowed": True,
             "limit_reached": False,
+            "reset_credits": 0,
             "primary_window": None,
             "secondary_window": {
                 "limit_window_seconds": 604800,
@@ -106,6 +110,7 @@ def build_payload(account_id: str) -> dict:
             "plan_type": "free",
             "allowed": True,
             "limit_reached": False,
+            "reset_credits": 1,
             "primary_window": None,
             "secondary_window": {
                 "limit_window_seconds": 604800,
@@ -141,7 +146,7 @@ def build_payload(account_id: str) -> dict:
         },
     )
 
-    return {
+    payload = {
         "plan_type": usage["plan_type"],
         "rate_limit": {
             "allowed": usage["allowed"],
@@ -150,6 +155,9 @@ def build_payload(account_id: str) -> dict:
             "secondary_window": usage["secondary_window"],
         },
     }
+    if "reset_credits" in usage:
+        payload["rate_limit_reset_credits"] = {"available_count": usage["reset_credits"]}
+    return payload
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -168,6 +176,34 @@ class Handler(BaseHTTPRequestHandler):
         payload = build_payload(account_id)
         body = json.dumps(payload).encode("utf-8")
 
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):
+        if self.path != "/backend-api/wham/rate-limit-reset-credits/consume":
+            self.send_response(404)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"error":"not found"}')
+            return
+
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        if length > 0:
+            self.rfile.read(length)
+        account_id = self.headers.get("ChatGPT-Account-Id", "").strip()
+        code = "reset"
+        windows_reset = 1
+        if account_id.endswith("epsilon"):
+            code = "nothing_to_reset"
+            windows_reset = 0
+        elif account_id.endswith("eta"):
+            code = "no_credit"
+            windows_reset = 0
+
+        body = json.dumps({"code": code, "windows_reset": windows_reset}).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))

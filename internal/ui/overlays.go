@@ -66,6 +66,10 @@ func (m Model) currentOverlayModal() string {
 		return m.renderWarmupProgressModal()
 	}
 
+	if m.RateLimitResetVisible {
+		return m.renderRateLimitResetModal()
+	}
+
 	if m.Err != nil {
 		return m.renderErrorModal()
 	}
@@ -225,9 +229,13 @@ func (m Model) renderInfoModal() string {
 
 	allowed := "n/a"
 	limitReached := "n/a"
+	resetCredits := "n/a"
 	if m.Data.PlanType != "" || len(m.Data.Windows) > 0 {
 		allowed = boolText(m.Data.Allowed)
 		limitReached = boolText(m.Data.LimitReached)
+	}
+	if m.Data.AvailableRateLimitResetCredits != nil {
+		resetCredits = fmt.Sprintf("%d", *m.Data.AvailableRateLimitResetCredits)
 	}
 
 	lines := []string{
@@ -238,6 +246,7 @@ func (m Model) renderInfoModal() string {
 		fmt.Sprintf("%s %s", InfoKeyStyle.Render("plan_type:"), InfoValueStyle.Render(plan)),
 		fmt.Sprintf("%s %s", InfoKeyStyle.Render("allowed:"), InfoValueStyle.Render(allowed)),
 		fmt.Sprintf("%s %s", InfoKeyStyle.Render("limit_reached:"), InfoValueStyle.Render(limitReached)),
+		fmt.Sprintf("%s %s", InfoKeyStyle.Render("reset_credits:"), InfoValueStyle.Render(resetCredits)),
 	}
 
 	content := strings.Join(lines, "\n")

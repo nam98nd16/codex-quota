@@ -226,6 +226,7 @@ var (
 	shouldRefreshTokenSoon = auth.ShouldRefreshSoon
 	refreshAccountToken    = auth.RefreshToken
 	callQuotaAPI           = api.CallAPI
+	consumeResetCredit     = api.ConsumeRateLimitResetCredit
 )
 
 func FetchDataCmd(account *config.Account, background bool) tea.Cmd {

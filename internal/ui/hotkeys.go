@@ -141,6 +141,11 @@ func (m Model) handleActionMenu(keyStr string) (tea.Model, tea.Cmd) {
 		return m.confirmActionMenu()
 	case "w":
 		return m.beginWarmupSelect()
+	case "e":
+		if available, ok := m.activeRateLimitResetCredits(); ok && available > 0 {
+			return m.beginRateLimitResetFlow()
+		}
+		return m, nil
 	}
 
 	if len(keyStr) == 1 && keyStr[0] >= '1' && keyStr[0] <= '9' {

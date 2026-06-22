@@ -116,6 +116,9 @@ func (m Model) renderFooter() string {
 	if m.WarmupRunning {
 		return fmt.Sprintf("Warmup: %d/%d (%d%%) • warmed %d • skipped %d • failed %d", m.WarmupCompleted, m.WarmupTotal, m.warmupProgressPercent(), m.WarmupWarmed, m.WarmupSkipped, m.WarmupFailed)
 	}
+	if m.RateLimitResetVisible {
+		return m.rateLimitResetFooter()
+	}
 	if m.CompactMode {
 		if m.CompactSearchActive {
 			return "Search: type to filter • Enter Close • Esc Cancel • Ctrl+U Clear"

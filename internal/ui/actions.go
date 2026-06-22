@@ -30,6 +30,8 @@ func (m Model) confirmActionMenu() (tea.Model, tea.Cmd) {
 		return m.beginApplyFlow()
 	case actionMenuRefresh:
 		return m.beginRefreshActive()
+	case actionMenuResetLimit:
+		return m.beginRateLimitResetFlow()
 	case actionMenuRefreshAll:
 		return m.beginRefreshAll()
 	case actionMenuWarm:
@@ -70,6 +72,7 @@ func (m *Model) openHelpOverlay() {
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.resetWarmupState()
+	m.resetRateLimitResetState()
 	m.ShowInfo = false
 	m.Notice = ""
 	m.Err = nil
@@ -88,6 +91,7 @@ func (m *Model) openActionMenu() {
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.resetWarmupState()
+	m.resetRateLimitResetState()
 	m.ShowInfo = false
 	m.Notice = ""
 	m.Err = nil
@@ -117,6 +121,7 @@ func (m *Model) openUpdatePrompt() bool {
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.resetWarmupState()
+	m.resetRateLimitResetState()
 	return true
 }
 
@@ -179,6 +184,7 @@ func (m Model) beginRefreshActive() (tea.Model, tea.Cmd) {
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.resetWarmupState()
+	m.resetRateLimitResetState()
 	m.Notice = ""
 
 	if m.LoadingMap == nil {
@@ -206,6 +212,7 @@ func (m Model) beginRefreshAll() (tea.Model, tea.Cmd) {
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.resetWarmupState()
+	m.resetRateLimitResetState()
 	m.Notice = ""
 
 	m.UsageData = make(map[string]api.UsageData)
@@ -240,6 +247,7 @@ func (m Model) toggleViewMode() (tea.Model, tea.Cmd) {
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.resetWarmupState()
+	m.resetRateLimitResetState()
 	m.Notice = ""
 	return m, tea.Batch(m.fetchNextCmd(), m.ensureAnimationTickCmd(), SaveUIStateSnapshotCmd(m.uiStateSnapshot()))
 }
@@ -258,6 +266,7 @@ func (m Model) beginAddAccount() (tea.Model, tea.Cmd) {
 	m.resetDeleteState()
 	m.resetApplyState()
 	m.resetWarmupState()
+	m.resetRateLimitResetState()
 	m.ShowInfo = false
 	m.Notice = ""
 	return m, StartAddAccountLoginCmd()
@@ -270,6 +279,7 @@ func (m Model) beginApplyFlow() (tea.Model, tea.Cmd) {
 	m.resetHelpState()
 	m.resetActionMenuState()
 	m.resetDeleteState()
+	m.resetRateLimitResetState()
 	m.closeCompactDetail()
 	m.closeCompactSearch()
 	m.startApplyFlow()
