@@ -49,7 +49,7 @@ func (m Model) beginRateLimitResetFlow() (tea.Model, tea.Cmd) {
 	m.Err = nil
 	m.RateLimitResetVisible = true
 	m.RateLimitResetStage = rateLimitResetConfirm
-	m.RateLimitResetCursor = 1
+	m.RateLimitResetCursor = 0
 	m.RateLimitResetAccountKey = account.Key
 	m.RateLimitResetRequestID = newRateLimitResetID()
 	m.RateLimitResetMessage = ""
@@ -62,6 +62,9 @@ func (m Model) handleRateLimitResetOverlay(keyStr string) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "esc":
 		if m.RateLimitResetStage != rateLimitResetRunning {
+			if m.RateLimitResetStage == rateLimitResetConfirm || m.RateLimitResetStage == rateLimitResetRetry {
+				return m.cancelRateLimitResetFlow()
+			}
 			m.resetRateLimitResetState()
 		}
 		return m, nil
@@ -77,6 +80,17 @@ func (m Model) handleRateLimitResetOverlay(keyStr string) (tea.Model, tea.Cmd) {
 			return m.confirmRateLimitResetSelection()
 		}
 		return m, nil
+	case "y":
+		if m.RateLimitResetStage == rateLimitResetConfirm || m.RateLimitResetStage == rateLimitResetRetry {
+			m.RateLimitResetCursor = 0
+			return m.confirmRateLimitResetSelection()
+		}
+		return m, nil
+	case "n":
+		if m.RateLimitResetStage == rateLimitResetConfirm || m.RateLimitResetStage == rateLimitResetRetry {
+			return m.cancelRateLimitResetFlow()
+		}
+		return m, nil
 	case "enter":
 		return m.confirmRateLimitResetSelection()
 	}
@@ -89,14 +103,20 @@ func (m Model) confirmRateLimitResetSelection() (tea.Model, tea.Cmd) {
 		if m.RateLimitResetCursor == 0 {
 			return m.startRateLimitResetConsume()
 		}
-		m.resetRateLimitResetState()
-		return m, nil
+		return m.cancelRateLimitResetFlow()
 	case rateLimitResetMessage:
 		m.resetRateLimitResetState()
 		return m, nil
 	default:
 		return m, nil
 	}
+}
+
+func (m Model) cancelRateLimitResetFlow() (tea.Model, tea.Cmd) {
+	m.resetRateLimitResetState()
+	m.Notice = "rate-limit reset cancelled"
+	m.noticeSeq++
+	return m, scheduleNoticeClearCmd(m.noticeSeq)
 }
 
 func (m Model) startRateLimitResetConsume() (tea.Model, tea.Cmd) {
@@ -126,7 +146,7 @@ func (m Model) handleRateLimitResetConsumed(msg RateLimitResetConsumedMsg) (tea.
 	m.RateLimitResetCursor = 0
 	if msg.Err != nil {
 		m.RateLimitResetStage = rateLimitResetRetry
-		m.RateLimitResetMessage = "Couldn't reset usage. Please try again."
+		m.RateLimitResetMessage = rateLimitResetErrorMessage(msg.Err)
 		return m, nil
 	}
 
@@ -252,14 +272,44 @@ func (m *Model) moveRateLimitResetCursor(delta int) {
 func rateLimitResetOutcomeMessage(outcome api.RateLimitResetOutcome) string {
 	switch outcome {
 	case api.RateLimitResetOutcomeReset, api.RateLimitResetOutcomeAlreadyRedeemed:
-		return "Usage reset. Refreshing quota..."
+		return "Usage reset. Checking remaining resets..."
 	case api.RateLimitResetOutcomeNothingToReset:
-		return "This account does not need a reset right now."
+		return "No eligible usage window to reset. Credit was not consumed."
 	case api.RateLimitResetOutcomeNoCredit:
-		return "No rate-limit resets are available."
+		return "No rate-limit resets are available. Credit was not consumed."
 	default:
 		return "Rate-limit reset finished."
 	}
+}
+
+func rateLimitResetErrorMessage(err error) string {
+	if err == nil {
+		return "Couldn't reset usage. Please try again."
+	}
+	message := strings.TrimSpace(err.Error())
+	if message == "" {
+		return "Couldn't reset usage. Please try again."
+	}
+	return "Couldn't reset usage: " + truncateLabelStrict(message, 110)
+}
+
+func (m *Model) finishRateLimitResetRefreshMessage(accountKey string, data api.UsageData) {
+	if !m.RateLimitResetVisible || m.RateLimitResetStage != rateLimitResetMessage || accountKey != m.RateLimitResetAccountKey {
+		return
+	}
+	if !strings.HasPrefix(m.RateLimitResetMessage, "Usage reset.") {
+		return
+	}
+	if data.AvailableRateLimitResetCredits == nil {
+		m.RateLimitResetMessage = "Usage reset. Quota refreshed."
+		return
+	}
+	count := *data.AvailableRateLimitResetCredits
+	if count == 1 {
+		m.RateLimitResetMessage = "Usage reset. You have 1 rate-limit reset left."
+		return
+	}
+	m.RateLimitResetMessage = fmt.Sprintf("Usage reset. You have %d rate-limit resets left.", count)
 }
 
 func randomRateLimitResetID() string {

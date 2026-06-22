@@ -6,7 +6,11 @@ import (
 )
 
 func (m Model) renderRateLimitResetModal() string {
-	lines := []string{WarningStyle.Render("Rate-limit reset")}
+	title := "Rate-limit reset"
+	if m.RateLimitResetStage == rateLimitResetConfirm {
+		title = "Confirm rate-limit reset"
+	}
+	lines := []string{WarningStyle.Render(title)}
 	if account := m.findAccountByKey(m.RateLimitResetAccountKey); account != nil {
 		lines = append(lines, InfoValueStyle.Render("Account: "+truncateLabel(m.displayAccountLabel(account), 44)))
 	}
@@ -15,12 +19,13 @@ func (m Model) renderRateLimitResetModal() string {
 	switch m.RateLimitResetStage {
 	case rateLimitResetConfirm:
 		available, _ := m.activeRateLimitResetCredits()
-		lines = append(lines, InfoValueStyle.Render(fmt.Sprintf("Use one of %d available reset credits?", available)))
+		lines = append(lines, InfoValueStyle.Render(fmt.Sprintf("Use 1 of %d available reset credits?", available)))
+		lines = append(lines, ActionMenuHintStyle.Render("This resets eligible Codex usage windows."))
 		lines = append(lines, "")
 		lines = append(lines, m.renderRateLimitResetOption(0, "Use reset"))
 		lines = append(lines, m.renderRateLimitResetOption(1, "Cancel"))
 		lines = append(lines, "")
-		lines = append(lines, ActionMenuHintStyle.Render("[↑/↓] Move   [enter] Select   [esc] Cancel"))
+		lines = append(lines, ActionMenuHintStyle.Render("[y/1/enter] Use reset   [n/2/esc] Cancel"))
 	case rateLimitResetRunning:
 		lines = append(lines, InfoValueStyle.Render("Resetting usage..."))
 		lines = append(lines, "")
@@ -35,7 +40,7 @@ func (m Model) renderRateLimitResetModal() string {
 		lines = append(lines, m.renderRateLimitResetOption(0, "Try again"))
 		lines = append(lines, m.renderRateLimitResetOption(1, "Close"))
 		lines = append(lines, "")
-		lines = append(lines, ActionMenuHintStyle.Render("[↑/↓] Move   [enter] Select   [esc] Cancel"))
+		lines = append(lines, ActionMenuHintStyle.Render("[y/1/enter] Try again   [n/2/esc] Close"))
 	case rateLimitResetMessage:
 		message := strings.TrimSpace(m.RateLimitResetMessage)
 		if message == "" {
@@ -68,6 +73,6 @@ func (m Model) rateLimitResetFooter() string {
 	case rateLimitResetMessage:
 		return "Rate-limit reset: Enter/Esc Close"
 	default:
-		return "Rate-limit reset: ↑↓ Move • Enter Select • Esc Cancel"
+		return "Rate-limit reset: y/Enter Use • n/Esc Cancel"
 	}
 }

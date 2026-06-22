@@ -543,6 +543,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				delete(m.compactBarAnimations, msg.AccountKey)
 			}
+			m.finishRateLimitResetRefreshMessage(msg.AccountKey, msg.Data)
 			if msg.AccountKey == m.activeAccountKey() {
 				m.startTabWindowAnimations(msg.AccountKey, prevData, hadPrevData, msg.Data, wasLoading, tabLoadAnimationDuration)
 			}
