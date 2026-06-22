@@ -137,6 +137,49 @@ func TestCompactFiveColumnRowsUseUltraDenseRelativeResetText(t *testing.T) {
 	}
 }
 
+func TestCompactRowsShowRateLimitResetCredits(t *testing.T) {
+	m := testCompactScrollModel(3, 120, 24)
+	setTestCompactResetCredits(&m, "managed:00", 2)
+	setTestCompactResetCredits(&m, "managed:01", 0)
+	rendered := ansi.Strip(m.renderCompactViewWithin(m.compactListViewportHeight()))
+
+	if !strings.Contains(rendered, "R2") {
+		t.Fatalf("expected reset credit badge in compact rows:\n%s", rendered)
+	}
+	if strings.Contains(rendered, "R0") {
+		t.Fatalf("did not expect zero reset credit badge:\n%s", rendered)
+	}
+}
+
+func TestCompactRowsCapLargeRateLimitResetCredits(t *testing.T) {
+	m := testCompactScrollModel(3, 120, 24)
+	setTestCompactResetCredits(&m, "managed:00", 12)
+	rendered := ansi.Strip(m.renderCompactViewWithin(m.compactListViewportHeight()))
+
+	if !strings.Contains(rendered, "R9+") {
+		t.Fatalf("expected capped reset credit badge in compact rows:\n%s", rendered)
+	}
+}
+
+func TestCompactMultiColumnRowsWithRateLimitResetCreditsStayWithinWidth(t *testing.T) {
+	for _, width := range []int{202, 210} {
+		m := testCompactScrollModel(80, width, 24)
+		setTestCompactResetCredits(&m, "managed:00", 2)
+		setTestCompactResetCredits(&m, "managed:25", 12)
+		rendered := ansi.Strip(m.renderCompactViewWithin(m.compactListViewportHeight()))
+		contentWidth := m.compactContentWidth()
+
+		for _, line := range strings.Split(rendered, "\n") {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			if got := ansi.StringWidth(line); got > contentWidth {
+				t.Fatalf("width %d: line width = %d, want <= %d\n%s", width, got, contentWidth, line)
+			}
+		}
+	}
+}
+
 func TestCompactFiveColumnLayoutUsesAvailableCellWidth(t *testing.T) {
 	narrowLineWidth, narrowAccountWidth, narrowBarWidth := compactFiveColumnCellMetrics(t, 210)
 	wideLineWidth, wideAccountWidth, wideBarWidth := compactFiveColumnCellMetrics(t, 230)
@@ -161,6 +204,15 @@ func TestCompactFiveColumnLayoutUsesAvailableCellWidth(t *testing.T) {
 	}
 }
 
+func setTestCompactResetCredits(m *Model, key string, count int64) {
+	data := m.UsageData[key]
+	data.AvailableRateLimitResetCredits = &count
+	m.UsageData[key] = data
+	if len(m.Accounts) > 0 && m.Accounts[m.ActiveAccountIx].Key == key {
+		m.Data = data
+	}
+}
+
 func compactFiveColumnCellMetrics(t *testing.T, terminalWidth int) (lineWidth int, accountWidth int, barWidth int) {
 	t.Helper()
 	m := testCompactScrollModel(80, terminalWidth, 24)
@@ -171,7 +223,7 @@ func compactFiveColumnCellMetrics(t *testing.T, terminalWidth int) (lineWidth in
 	lineWidth = compactColumnLineWidth(columnWidth, columns)
 	accountWidth = m.compactAccountWidthForColumn(lineWidth, columns)
 	leftWidth := ansi.StringWidth("  ") + accountWidth + 1
-	barWidth, _, _ = m.compactRowLayout(leftWidth, compactAccountRowDensity(lineWidth), lineWidth)
+	barWidth, _, _, _ = m.compactRowLayout(leftWidth, compactAccountRowDensity(lineWidth), lineWidth, m.hasCompactResetCreditColumn())
 	return lineWidth, accountWidth, barWidth
 }
 

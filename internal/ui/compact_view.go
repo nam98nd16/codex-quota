@@ -120,7 +120,7 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 	if refreshWidth > 0 {
 		leftWidth += refreshWidth + 1
 	}
-	barWidth, percentWidth, resetWidth := m.compactRowLayout(leftWidth, density, rowWidth)
+	barWidth, percentWidth, creditWidth, resetWidth := m.compactRowLayout(leftWidth, density, rowWidth, m.hasCompactResetCreditColumn())
 
 	s.WriteString(prefix)
 	if badgeWidth > 0 {
@@ -148,23 +148,23 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 
 	if err := m.ErrorsMap[acc.Key]; err != nil && !(m.BackgroundErrorMap[acc.Key] && hasRenderableQuotaData(m.UsageData[acc.Key])) {
 		status := "Error: " + compactErrorText(err)
-		s.WriteString(m.renderCompactStatusRow(status, subscribed, barWidth, percentWidth, resetWidth))
+		s.WriteString(m.renderCompactStatusRow(status, subscribed, barWidth, percentWidth, creditWidth, resetWidth))
 		return s.String()
 	}
 	if m.LoadingMap[acc.Key] {
-		s.WriteString(m.renderCompactStatusRow("Loading...", subscribed, barWidth, percentWidth, resetWidth))
+		s.WriteString(m.renderCompactStatusRow("Loading...", subscribed, barWidth, percentWidth, creditWidth, resetWidth))
 		return s.String()
 	}
 
 	data, ok := m.UsageData[acc.Key]
 	if !ok {
-		s.WriteString(m.renderCompactStatusRow("Queued...", subscribed, barWidth, percentWidth, resetWidth))
+		s.WriteString(m.renderCompactStatusRow("Queued...", subscribed, barWidth, percentWidth, creditWidth, resetWidth))
 		return s.String()
 	}
 
 	window, ok := compactPrimaryWindow(data)
 	if !ok {
-		s.WriteString(m.renderCompactStatusRow("No quota data", subscribed, barWidth, percentWidth, resetWidth))
+		s.WriteString(m.renderCompactStatusRow("No quota data", subscribed, barWidth, percentWidth, creditWidth, resetWidth))
 		return s.String()
 	}
 
@@ -173,6 +173,7 @@ func (m Model) renderCompactAccountRow(index int, acc *config.Account, accountWi
 	s.WriteString(renderSmoothBar(barWidth, ratio, gradientStart, gradientEnd))
 	s.WriteString(" ")
 	s.WriteString(m.renderCompactPercentValue(window.LeftPercent, subscribed, percentWidth))
+	s.WriteString(renderCompactResetCredit(data, creditWidth))
 	resetText := compactResetText(window.ResetAt)
 	if density.usesRelativeReset() {
 		resetText = compactDenseResetText(window.ResetAt)
@@ -208,8 +209,8 @@ func hasRenderableQuotaData(data api.UsageData) bool {
 	return len(data.Windows) > 0
 }
 
-func (m Model) renderCompactStatusRow(status string, subscribed bool, barWidth, percentWidth, resetWidth int) string {
-	statusWidth := barWidth + 1 + percentWidth
+func (m Model) renderCompactStatusRow(status string, subscribed bool, barWidth, percentWidth, creditWidth, resetWidth int) string {
+	statusWidth := barWidth + 1 + percentWidth + creditWidth
 	style := ActionMenuHintStyle.Copy().Width(statusWidth)
 	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(status)), "error") {
 		style = ErrorStyle.Copy().Width(statusWidth)
@@ -311,7 +312,7 @@ func (m Model) compactAccountWidthForColumn(width int, columns int) int {
 	}
 }
 
-func (m Model) compactRowLayout(leftWidth int, density compactRowDensity, rowWidth int) (barWidth, percentWidth, resetWidth int) {
+func (m Model) compactRowLayout(leftWidth int, density compactRowDensity, rowWidth int, creditColumn bool) (barWidth, percentWidth, creditWidth, resetWidth int) {
 	contentWidth := rowWidth
 	if contentWidth <= 0 {
 		contentWidth = m.preferredContentWidth()
@@ -330,10 +331,13 @@ func (m Model) compactRowLayout(leftWidth int, density compactRowDensity, rowWid
 		percentWidth = 5
 		resetWidth = compactResetWidth(contentWidth)
 	}
+	if creditColumn {
+		creditWidth = compactResetCreditWidth
+	}
 
 	available := contentWidth - leftWidth
 	if available <= 0 {
-		return 6, 3, 0
+		return 6, 3, 0, 0
 	}
 
 	const (
@@ -344,12 +348,12 @@ func (m Model) compactRowLayout(leftWidth int, density compactRowDensity, rowWid
 		resetMarginLeft = 2
 	)
 
-	used := barWidth + gapWidth + percentWidth + resetMarginLeft + resetWidth
+	used := barWidth + gapWidth + percentWidth + creditWidth + resetMarginLeft + resetWidth
 	if density == compactRowDensityUltra || density == compactRowDensityDense {
-		barBudget := available - gapWidth - percentWidth - resetMarginLeft - resetWidth
+		barBudget := available - gapWidth - percentWidth - creditWidth - resetMarginLeft - resetWidth
 		if barBudget > barWidth {
 			barWidth = min(barBudget, min(m.defaultBarWidth(), compactDenseBarMaxWidth(density)))
-			used = barWidth + gapWidth + percentWidth + resetMarginLeft + resetWidth
+			used = barWidth + gapWidth + percentWidth + creditWidth + resetMarginLeft + resetWidth
 		}
 	}
 	shortage := used - available
@@ -378,8 +382,13 @@ func (m Model) compactRowLayout(leftWidth int, density compactRowDensity, rowWid
 		return
 	}
 
-	barWidth = reduce(barWidth, minBarWidth)
-	resetWidth = reduce(resetWidth, minResetWidth)
+	if creditWidth > 0 {
+		resetWidth = reduce(resetWidth, minResetWidth)
+		barWidth = reduce(barWidth, minBarWidth)
+	} else {
+		barWidth = reduce(barWidth, minBarWidth)
+		resetWidth = reduce(resetWidth, minResetWidth)
+	}
 	percentWidth = reduce(percentWidth, minPercentWidth)
 
 	return

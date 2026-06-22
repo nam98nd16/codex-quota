@@ -42,6 +42,10 @@ var (
 			Align(lipgloss.Left).
 			Foreground(lipgloss.Color("241")).
 			MarginLeft(2)
+	ResetCreditStyle = lipgloss.NewStyle().
+				Width(compactResetCreditWidth).
+				Align(lipgloss.Right).
+				Foreground(lipgloss.Color("39"))
 
 	HelpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
